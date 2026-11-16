@@ -265,7 +265,7 @@ def optimize_frontier(
 
     gamma_values = np.logspace(
         gamma_min,
-        ,
+        gamma_max,
         num=n_portfolios
     )
 
