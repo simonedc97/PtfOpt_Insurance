@@ -205,7 +205,7 @@ def optimize_frontier(
     asset_perc,
     n_portfolios,
     gamma_min,
-    gamma_max,
+    ,
     lambda_duration
 ):
     """
@@ -265,7 +265,7 @@ def optimize_frontier(
 
     gamma_values = np.logspace(
         gamma_min,
-        gamma_max,
+        ,
         num=n_portfolios
     )
 
@@ -326,7 +326,7 @@ def simulate(
     asset_perc,
     n_portfolios,
     gamma_min,
-    gamma_max,
+    ,
     lambda_duration,
     seed=None,
     progress_callback=None
@@ -373,7 +373,7 @@ def simulate(
             asset_perc=asset_perc,
             n_portfolios=n_portfolios,
             gamma_min=gamma_min,
-            gamma_max=gamma_max,
+            =,
             lambda_duration=lambda_duration
         )
 
@@ -959,10 +959,6 @@ if eigenvalues.min() < -1e-8:
         "The original model does not adjust the matrix automatically. "
         "Please revise the correlation assumptions."
     )
-    st.stop()
-
-if gamma_max <= gamma_min:
-    st.error("Gamma maximum must be greater than gamma minimum.")
     st.stop()
 
 min_weight = min_weight_pct / 100.0
