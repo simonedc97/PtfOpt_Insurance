@@ -741,7 +741,7 @@ with st.sidebar:
     duration_liab = st.number_input(
         "Liability duration",
         min_value=0.0,
-        value=7.0,
+        value=0.0,
         step=0.1
     )
 
