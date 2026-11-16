@@ -852,7 +852,7 @@ if (
 n_assets = len(asset_names)
 
 # %% CORRELATION MATRIX
-
+st.subheader("Correlation matrix")
 
 default_corr = np.full(
     (n_assets, n_assets),
