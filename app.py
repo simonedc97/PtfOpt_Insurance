@@ -710,47 +710,6 @@ with st.sidebar:
 
     st.header("Model settings")
 
-    n_simulations = st.number_input(
-        "Monte Carlo simulations",
-        min_value=1,
-        max_value=500,
-        value=SIM,
-        step=1
-    )
-
-    n_observations = SIMULATION
-
-    st.caption(
-        f"Observations per simulation: {SIMULATION}"
-    )
-
-    n_portfolios = st.number_input(
-        "Portfolios on the frontier",
-        min_value=10,
-        max_value=300,
-        value=DEFAULT_FRONTIER_POINTS,
-        step=5
-    )
-
-    gamma_min = st.number_input(
-        "Gamma minimum (log10)",
-        value=float(GAMMA_MIN),
-        step=0.5
-    )
-
-    gamma_max = st.number_input(
-        "Gamma maximum (log10)",
-        value=float(GAMMA_MAX),
-        step=0.5
-    )
-
-    lambda_duration = st.number_input(
-        "Lambda duration",
-        min_value=0.0,
-        value=LAMBDA_DURATION,
-        step=0.1
-    )
-
     min_weight_pct = st.number_input(
         "Minimum weight (%)",
         min_value=0.0,
@@ -765,20 +724,6 @@ with st.sidebar:
         max_value=100.0,
         value=MAX_WEIGHT * 100,
         step=1.0
-    )
-
-    use_seed = st.checkbox(
-        "Use fixed random seed",
-        value=False
-    )
-
-    seed = st.number_input(
-        "Random seed",
-        min_value=0,
-        max_value=999999,
-        value=42,
-        step=1,
-        disabled=not use_seed
     )
 
     st.divider()
