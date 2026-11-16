@@ -1297,17 +1297,17 @@ k4.metric(
 # %% TABS
 
 (
+    tab_data,
     tab_overview,
     tab_portfolio,
     tab_marginal,
-    tab_reallocation,
-    tab_data
+    tab_reallocation
 ) = st.tabs([
-    "Overview",
+    "Portfolio Weights"
+    "Graph",
     "Portfolio analysis",
     "Marginal SCR",
-    "Reallocation analysis",
-    "Data tables"
+    "Reallocation analysis"
 ])
 
 # ============================================================
