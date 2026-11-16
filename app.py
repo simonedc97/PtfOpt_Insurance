@@ -989,30 +989,7 @@ duration_target = (
     duration_liab * liability_pct / asset_pct
 )
 
-with st.expander("Input diagnostics"):
 
-    st.write("Correlation matrix used")
-
-    st.dataframe(
-        corr_df.style.format("{:.3f}"),
-        use_container_width=True
-    )
-
-    st.write("Covariance matrix used")
-
-    st.dataframe(
-        cov.style.format("{:.6f}"),
-        use_container_width=True
-    )
-
-    st.write(
-        f"**Target duration:** {duration_target:.3f}"
-    )
-
-    st.write(
-        f"**Minimum correlation eigenvalue:** "
-        f"{eigenvalues.min():.8f}"
-    )
 
 # %% MODEL EXECUTION
 
