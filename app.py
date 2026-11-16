@@ -174,7 +174,7 @@ def simulate(
     dates = pd.date_range(
         start='2026-09-30',
         periods=SIMULATION,
-        freq='Y'
+        freq='YE'
     )
 
     # Generazione preventiva di tutte le simulazioni
