@@ -87,7 +87,7 @@ DEFAULT_ASSETS = pd.DataFrame({
         4.9, 6.0, 5.5, 7.1, 4.8,
         3.89, 4.5, 3.7, 5.2, 10.0
     ],
-    "SCR Market (%)": [
+    "Volatility (%)": [
         16.0, 30.2, 18.495, 26.167, 21.0,
         11.0, 46.0, 22.78, 22.0, 22.0
     ],
@@ -804,8 +804,8 @@ edited_assets = st.data_editor(
             "Expected Return (%)",
             format="%.3f"
         ),
-        "SCR Market (%)": st.column_config.NumberColumn(
-            "SCR Market (%)",
+        "Volatility (%)": st.column_config.NumberColumn(
+            "Volatility (%)",
             format="%.3f"
         ),
         "Duration": st.column_config.NumberColumn(
@@ -832,7 +832,7 @@ if (
 
 numeric_cols = [
     "Expected Return (%)",
-    "SCR Market (%)",
+    "Volatility (%)",
     "Duration"
 ]
 
@@ -845,7 +845,7 @@ except Exception:
 if (
     numeric_data.isna().any().any()
     or not np.isfinite(numeric_data.values).all()
-    or (numeric_data["SCR Market (%)"] <= 0).any()
+    or (numeric_data["Volatility (%)"] <= 0).any()
     or (numeric_data["Duration"] < 0).any()
 ):
     st.error(
@@ -914,7 +914,7 @@ try:
     )
 
     vol = (
-        numeric_data["SCR Market (%)"].to_numpy()
+        numeric_data["Volatility (%)"].to_numpy()
         / 100.0
     )
 
