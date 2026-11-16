@@ -1178,14 +1178,8 @@ inputs_changed = (
     or res["inputs"]["duration_liab"] != float(duration_liab)
     or res["inputs"]["liability_pct"] != float(liability_pct)
     or res["inputs"]["asset_pct"] != float(asset_pct)
-    or res["inputs"]["gamma_min"] != float(gamma_min)
-    or res["inputs"]["gamma_max"] != float(gamma_max)
-    or res["inputs"]["lambda_duration"] != float(lambda_duration)
     or res["inputs"]["min_weight"] != min_weight
     or res["inputs"]["max_weight"] != max_weight
-    or res["n_simulations"] != int(n_simulations)
-    or res["n_portfolios"] != int(n_portfolios)
-    or res["seed"] != (int(seed) if use_seed else None)
 )
 
 if inputs_changed:
