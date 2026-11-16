@@ -1303,7 +1303,7 @@ k4.metric(
     tab_marginal,
     tab_reallocation
 ) = st.tabs([
-    "Portfolio Weights"
+    "Portfolio Weights",
     "Graph",
     "Portfolio analysis",
     "Marginal SCR",
