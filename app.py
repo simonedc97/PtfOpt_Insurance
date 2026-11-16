@@ -712,11 +712,6 @@ def calculate_reallocation_analysis(
 
 st.title("Portfolio Optimization Dashboard")
 
-st.caption(
-    "Efficient frontier | Monte Carlo | SCR | Duration Matching "
-    "| Marginal SCR | Reallocation Analysis"
-)
-
 # %% SIDEBAR
 
 with st.sidebar:
