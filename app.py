@@ -205,7 +205,7 @@ def optimize_frontier(
     asset_perc,
     n_portfolios,
     gamma_min,
-    ,
+    gamma_max,
     lambda_duration
 ):
     """
