@@ -87,7 +87,7 @@ DEFAULT_ASSETS = pd.DataFrame({
         4.9, 6.0, 5.5, 7.1, 4.8,
         3.89, 4.5, 3.7, 5.2, 10.0
     ],
-    "Volatility (%)": [
+    "": [
         16.0, 30.2, 18.495, 26.167, 21.0,
         11.0, 46.0, 22.78, 22.0, 22.0
     ],
@@ -805,7 +805,7 @@ edited_assets = st.data_editor(
             format="%.3f"
         ),
         "Volatility (%)": st.column_config.NumberColumn(
-            "Volatility (%)",
+            "SCR Market (%)",
             format="%.3f"
         ),
         "Duration": st.column_config.NumberColumn(
