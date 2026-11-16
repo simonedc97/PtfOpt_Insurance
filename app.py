@@ -267,8 +267,8 @@ def optimize_frontier(
     # Original PortfolioConstraints
     constraints = [
         cp.sum(w) == TARGET_SUM,
-        w >= MIN_WEIGHT,
-        w <= MAX_WEIGHT
+        w >= min_weight,
+        w <= max_weight
     ]
 
     problem = cp.Problem(
