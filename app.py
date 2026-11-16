@@ -1,19 +1,15 @@
 
 import streamlit as st
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.ticker as mtick
-import pandas as pd
-import numpy as np
 import cvxpy as cp
 import warnings
 
-from dataclasses import dataclass
-from io import BytesIO
-
-
 # ============================================================
-# CONFIGURAZIONE
+# PARAMETRI ORIGINALI
 # ============================================================
 
 DEFAULT_FRONTIER_POINTS = 100
@@ -30,13 +26,14 @@ SIM = 100
 # ============================================================
 
 st.set_page_config(
-    page_title="Portfolio Optimization Dashboard",
+    page_title="Portfolio Optimization",
     layout="wide"
 )
 
 st.title("Portfolio Optimization Dashboard")
+
 st.caption(
-    "Streamlit implementation of the original Python model"
+    "Portfolio optimization model - Manual input version"
 )
 
 
@@ -44,19 +41,18 @@ st.caption(
 # CLASSI ORIGINALI
 # ============================================================
 
-@dataclass
 class PortfolioConstraints:
-    long_only: bool = True
-    max_weight: float = 1.0
-    min_weight: float = 0.0
-    target_sum: float = 1.0
+    long_only = True
+    max_weight = 1.0
+    min_weight = 0.0
+    target_sum = 1.0
 
 
-@dataclass
 class FrontierResult:
-    weights: pd.DataFrame
-    returns: np.ndarray
-    risks: np.ndarray
+    def __init__(self, weights, returns, risks):
+        self.weights = weights
+        self.returns = returns
+        self.risks = risks
 
 
 class EfficientFrontier:
@@ -162,7 +158,7 @@ class EfficientFrontier:
 
 
 # ============================================================
-# FUNZIONI DI SUPPORTO ORIGINALI
+# FUNZIONI ORIGINALI
 # ============================================================
 
 def simulate(
@@ -182,9 +178,8 @@ def simulate(
         freq='Y'
     )
 
-    # IMPORTANTE:
-    # Generazione preventiva di tutte le simulazioni,
-    # esattamente come nel codice originale.
+    # Generazione preventiva di tutte le simulazioni
+    # Nessun seed fisso
     simulations = [
         pd.DataFrame(
             np.random.multivariate_normal(
@@ -259,15 +254,13 @@ def corr_to_cov(corr_matrix, stdevs):
 
 def pltRandomMarkers(df):
 
-    valid_markers = (
-        [
-            item[0]
-            for item in mpl.markers.MarkerStyle.markers.items()
-            if item[1] != 'nothing'
-            and not item[1].startswith('tick')
-            and not item[1].startswith('caret')
-        ]
-    )
+    valid_markers = [
+        item[0]
+        for item in mpl.markers.MarkerStyle.markers.items()
+        if item[1] != 'nothing'
+        and not item[1].startswith('tick')
+        and not item[1].startswith('caret')
+    ]
 
     markers = np.random.choice(
         valid_markers,
@@ -291,12 +284,7 @@ def pltRandomMarkers(df):
     )
 
 
-def calculate_marginal_scr(
-    weights,
-    vol,
-    corr,
-    risk
-):
+def calculate_marginal_scr(weights, vol, corr, risk):
 
     D = vol.values
     CORR = corr.values
@@ -320,11 +308,7 @@ def calculate_marginal_scr(
     )
 
 
-def calculate_return_per_marginal_scr(
-    weights,
-    er,
-    mSCR
-):
+def calculate_return_per_marginal_scr(weights, er, mSCR):
 
     n_port = len(weights)
     n_asset = len(weights.columns)
@@ -356,42 +340,33 @@ def calculate_return_per_marginal_scr(
     )
 
 
-def classify_allocation(
-    dR,
-    dS,
-    tol=1e-12
-):
+def classify_allocation(dR, dS, tol=1e-12):
 
     if dR > tol and dS < -tol:
-
         return (
             "Aumento Rendimento / Diminuzione Rischio",
             "Miglioramento"
         )
 
     elif dR > tol and dS > tol:
-
         return (
             "Aumento Rendimento / Aumento Rischio",
             "Trade-off"
         )
 
     elif dR < -tol and dS < -tol:
-
         return (
             "Diminuzione Rendimento / Diminuzione Rischio",
             "Trade-off"
         )
 
     elif dR < -tol and dS > tol:
-
         return (
             "Diminuzione Rendimento / Aumento Rischio",
             "Peggioramento"
         )
 
     else:
-
         return (
             "Effetto nullo o invariato",
             "Da verificare"
@@ -436,19 +411,14 @@ def calculate_reallocation_analysis(
         for j in range(n_asset):
 
             if i == j:
-
                 OPPORTUNITA_MARG.iloc[i, j] = "N/A"
                 TRADEOFF_MARG.iloc[i, j] = "N/A"
-
                 continue
 
             dR = DELTA_REND[i, j]
             dS = DELTA_RISK_MARG[i, j]
 
-            classe, tradeoff = classify_allocation(
-                dR,
-                dS
-            )
+            classe, tradeoff = classify_allocation(dR, dS)
 
             OPPORTUNITA_MARG.iloc[i, j] = classe
             TRADEOFF_MARG.iloc[i, j] = tradeoff
@@ -546,103 +516,203 @@ def calculate_reallocation_analysis(
 
 
 # ============================================================
-# CARICAMENTO DATI
+# INPUT MANUALI - ASSET
 # ============================================================
 
-def load_market_assumptions(excel_bytes):
+st.header("1. Market assumptions")
 
-    df = pd.read_excel(
-        BytesIO(excel_bytes),
-        sheet_name='data',
-        header=0,
-        index_col=0
-    )
-
-    vol = df['Vola']
-
-    er = df['ExpRet'] / ANNUALIZATION_FACTOR
-
-    duration = df['Dur']
-
-    corr = pd.read_excel(
-        BytesIO(excel_bytes),
-        sheet_name='data',
-        header=0,
-        index_col=0,
-        usecols='A,G:O'
-    )
-
-    corr = corr.loc[vol.index, vol.index]
-
-    cov = (
-        corr_to_cov(corr, vol)
-        / ANNUALIZATION_FACTOR
-    )
-
-    df2 = pd.read_excel(
-        BytesIO(excel_bytes),
-        sheet_name='duration',
-        header=0
-    )
-
-    duration_liab = df2['DurLiab']
-    asset_perc = df2['Asset']
-    liab_perc = df2['Liability']
-
-    return (
-        er,
-        cov,
-        vol,
-        corr,
-        duration,
-        duration_liab,
-        asset_perc,
-        liab_perc
-    )
-
-
-# ============================================================
-# CARICAMENTO FILE E AVVIO
-# ============================================================
-
-uploaded_file = st.file_uploader(
-    "Carica il file data_2.xlsx",
-    type=["xlsx"]
+st.markdown(
+    "Inserisci i dati degli asset. "
+    "Expected Return e Volatility devono essere espressi "
+    "in forma decimale: ad esempio 0.049 = 4.9%."
 )
 
-if uploaded_file is not None:
+initial_assets = pd.DataFrame({
+    "Asset": [f"Asset {i}" for i in range(1, 10)],
+    "ExpRet": [0.0] * 9,
+    "Vola": [0.0] * 9,
+    "Dur": [0.0] * 9
+})
 
-    st.success("File caricato correttamente.")
+assets_df = st.data_editor(
+    initial_assets,
+    num_rows="dynamic",
+    use_container_width=True,
+    key="assets_editor",
+    column_config={
+        "Asset": st.column_config.TextColumn(
+            "Asset name",
+            required=True
+        ),
+        "ExpRet": st.column_config.NumberColumn(
+            "Expected Return",
+            format="%.6f"
+        ),
+        "Vola": st.column_config.NumberColumn(
+            "Volatility",
+            format="%.6f"
+        ),
+        "Dur": st.column_config.NumberColumn(
+            "Duration",
+            format="%.4f"
+        )
+    }
+)
 
-    if st.button(
-        "Avvia simulazione",
-        type="primary"
-    ):
+asset_names = assets_df["Asset"].astype(str).tolist()
+n_assets = len(asset_names)
+
+# ============================================================
+# INPUT MANUALI - CORRELAZIONE
+# ============================================================
+
+st.header("2. Correlation matrix")
+
+st.caption(
+    "Inserisci le correlazioni tra gli asset. "
+    "La diagonale deve essere pari a 1. "
+    "La matrice deve essere simmetrica."
+)
+
+if n_assets > 0:
+
+    corr_default = pd.DataFrame(
+        np.zeros((n_assets, n_assets)),
+        index=asset_names,
+        columns=asset_names
+    )
+
+    np.fill_diagonal(corr_default.values, 1.0)
+
+    corr_df = st.data_editor(
+        corr_default,
+        use_container_width=True,
+        key=f"corr_editor_{n_assets}",
+        column_config={
+            name: st.column_config.NumberColumn(
+                name,
+                format="%.4f"
+            )
+            for name in asset_names
+        }
+    )
+
+else:
+
+    corr_df = pd.DataFrame()
+
+
+# ============================================================
+# INPUT MANUALI - LIABILITY
+# ============================================================
+
+st.header("3. Liability and asset assumptions")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    duration_liab = st.number_input(
+        "Liability Duration",
+        value=0.0,
+        format="%.4f"
+    )
+
+with col2:
+    asset_perc = st.number_input(
+        "Asset Percentage",
+        value=1.0,
+        format="%.6f"
+    )
+
+with col3:
+    liab_perc = st.number_input(
+        "Liability Percentage",
+        value=1.0,
+        format="%.6f"
+    )
+
+
+# ============================================================
+# PARAMETRI MODELLO
+# ============================================================
+
+with st.expander("Model parameters", expanded=False):
+
+    st.write(f"Monte Carlo simulations: {SIM}")
+    st.write(f"Observations per simulation: {SIMULATION}")
+    st.write(f"Frontier points: {DEFAULT_FRONTIER_POINTS}")
+    st.write(f"Gamma minimum: {GAMMA_MIN}")
+    st.write(f"Gamma maximum: {GAMMA_MAX}")
+    st.write(f"Lambda duration: {LAMBDA_DURATION}")
+    st.write(f"Annualization factor: {ANNUALIZATION_FACTOR}")
+    st.write(f"Maximum weight: {PortfolioConstraints.max_weight}")
+    st.write(f"Minimum weight: {PortfolioConstraints.min_weight}")
+
+
+# ============================================================
+# AVVIO SIMULAZIONE
+# ============================================================
+
+if st.button("Run Portfolio Optimization", type="primary"):
+
+    try:
+
+        # --------------------------------------------
+        # PREPARAZIONE INPUT
+        # --------------------------------------------
+
+        if n_assets < 2:
+            raise ValueError("Inserire almeno due asset.")
+
+        if assets_df["Asset"].isna().any():
+            raise ValueError("Tutti gli asset devono avere un nome.")
+
+        if len(set(asset_names)) != n_assets:
+            raise ValueError("I nomi degli asset devono essere univoci.")
+
+        if assets_df[["ExpRet", "Vola", "Dur"]].isna().any().any():
+            raise ValueError("Completare tutti i valori degli asset.")
+
+        if (assets_df["Vola"] < 0).any():
+            raise ValueError("La volatilità non può essere negativa.")
+
+        if asset_perc == 0:
+            raise ValueError("Asset Percentage non può essere zero.")
+
+        if corr_df.isna().any().any():
+            raise ValueError("Completare la matrice di correlazione.")
+
+        er = pd.Series(
+            assets_df["ExpRet"].values,
+            index=asset_names
+        ) / ANNUALIZATION_FACTOR
+
+        vol = pd.Series(
+            assets_df["Vola"].values,
+            index=asset_names
+        )
+
+        duration = pd.Series(
+            assets_df["Dur"].values,
+            index=asset_names
+        )
+
+        corr = corr_df.copy()
+        corr.index = asset_names
+        corr.columns = asset_names
+
+        cov = (
+            corr_to_cov(corr, vol)
+            / ANNUALIZATION_FACTOR
+        )
+
+        # --------------------------------------------
+        # SIMULAZIONE E OTTIMIZZAZIONE
+        # --------------------------------------------
 
         with st.spinner(
-            "Esecuzione delle simulazioni Monte Carlo e ottimizzazione..."
+            "Running Monte Carlo simulations and optimization..."
         ):
-
-            # ================================================
-            # INPUT
-            # ================================================
-
-            excel_bytes = uploaded_file.getvalue()
-
-            (
-                er,
-                cov,
-                vol,
-                corr,
-                duration,
-                duration_liab,
-                asset_perc,
-                liab_perc
-            ) = load_market_assumptions(excel_bytes)
-
-            # ================================================
-            # OTTIMIZZAZIONE ORIGINALE
-            # ================================================
 
             weights, risk, exp_ret = simulate(
                 er,
@@ -670,8 +740,7 @@ if uploaded_file is not None:
             ) * ANNUALIZATION_FACTOR
 
             duration_asset = (
-                avg_weigths
-                @ duration.loc[avg_weigths.columns]
+                avg_weigths @ duration.loc[avg_weigths.columns]
             )
 
             duration_target = float(
@@ -693,9 +762,9 @@ if uploaded_file is not None:
             )
 
             new_fields = [
-                'Risk',
-                'Exp_Ret_Sim',
-                'Exp_Ret'
+                "Risk",
+                "Exp_Ret_Sim",
+                "Exp_Ret"
             ]
 
             opt.columns = (
@@ -705,45 +774,35 @@ if uploaded_file is not None:
                 )
             )
 
-            opt['Duration_Asset'] = duration_asset
-            opt['Duration_Liability'] = duration_liab
-            opt['Duration_Mismatch'] = duration_mismatch
+            opt["Duration_Asset"] = duration_asset
+            opt["Duration_Liability"] = duration_liab
+            opt["Duration_Mismatch"] = duration_mismatch
 
-            # ================================================
-            # STILE GRAFICI ORIGINALE
-            # ================================================
+            # ----------------------------------------
+            # GRAFICI
+            # ----------------------------------------
 
             plt.rcParams.update({
-                'font.family': 'Century Gothic',
-                'font.size': 10,
-                'axes.titlesize': 13,
-                'axes.labelsize': 11,
-                'legend.fontsize': 9,
-                'axes.spines.top': False,
-                'axes.spines.right': False,
-                'axes.grid': True,
-                'grid.alpha': 0.20,
-                'grid.linestyle': '--',
-                'figure.facecolor': 'white',
-                'axes.facecolor': 'white'
+                "font.family": "Century Gothic",
+                "font.size": 10,
+                "axes.titlesize": 13,
+                "axes.labelsize": 11,
+                "legend.fontsize": 9,
+                "axes.spines.top": False,
+                "axes.spines.right": False,
+                "axes.grid": True,
+                "grid.alpha": 0.20,
+                "grid.linestyle": "--",
+                "figure.facecolor": "white",
+                "axes.facecolor": "white"
             })
 
-            colors = plt.get_cmap('tab20')(
-                np.linspace(
-                    0,
-                    1,
-                    len(avg_weigths.columns)
-                )
+            colors = plt.get_cmap("tab20")(
+                np.linspace(0, 1, len(avg_weigths.columns))
             )
 
-            # ================================================
-            # GRAFICO 1
-            # ================================================
-
             weights_by_risk = avg_weigths.copy()
-
             weights_by_risk.index = avg_risk.values
-
             weights_by_risk = weights_by_risk.sort_index()
 
             fig, ax = plt.subplots(figsize=(13, 6))
@@ -756,30 +815,19 @@ if uploaded_file is not None:
             )
 
             ax.set_ylim(0, 1)
-
             ax.set_title(
-                'Portfolio Allocation across Risk Levels',
+                "Portfolio Allocation across Risk Levels",
                 pad=15,
-                weight='bold'
+                weight="bold"
             )
-
-            ax.set_xlabel('Portfolio SCR')
-            ax.set_ylabel('Portfolio Weights')
-
-            ax.yaxis.set_major_formatter(
-                mtick.PercentFormatter(1)
-            )
-
-            ax.xaxis.set_major_locator(
-                plt.MaxNLocator(10)
-            )
-
-            ax.xaxis.set_major_formatter(
-                mtick.FormatStrFormatter('%.2f')
-            )
+            ax.set_xlabel("Portfolio SCR")
+            ax.set_ylabel("Portfolio Weights")
+            ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+            ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+            ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%.2f"))
 
             ax.legend(
-                loc='upper center',
+                loc="upper center",
                 bbox_to_anchor=(0.5, -0.20),
                 ncol=3,
                 frameon=False
@@ -787,15 +835,9 @@ if uploaded_file is not None:
 
             plt.tight_layout()
 
-            # ================================================
-            # GRAFICO 2
-            # ================================================
-
             weights_by_risk_rounded = avg_weigths.copy()
 
-            weights_by_risk_rounded.index = (
-                avg_risk.round(2).values
-            )
+            weights_by_risk_rounded.index = avg_risk.round(2).values
 
             weights_by_risk_rounded = (
                 weights_by_risk_rounded
@@ -816,24 +858,17 @@ if uploaded_file is not None:
             )
 
             ax2.set_title(
-                'Asset Allocation by Portfolio Risk',
+                "Asset Allocation by Portfolio Risk",
                 pad=15,
-                weight='bold'
+                weight="bold"
             )
-
-            ax2.set_xlabel('Portfolio SCR')
-            ax2.set_ylabel('Portfolio Weights')
-
-            ax2.yaxis.set_major_formatter(
-                mtick.PercentFormatter(1)
-            )
-
-            ax2.xaxis.set_major_locator(
-                plt.MaxNLocator(10)
-            )
+            ax2.set_xlabel("Portfolio SCR")
+            ax2.set_ylabel("Portfolio Weights")
+            ax2.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+            ax2.xaxis.set_major_locator(plt.MaxNLocator(10))
 
             ax2.legend(
-                loc='upper center',
+                loc="upper center",
                 bbox_to_anchor=(0.5, -0.22),
                 ncol=3,
                 frameon=False
@@ -841,50 +876,33 @@ if uploaded_file is not None:
 
             plt.tight_layout()
 
-            # ================================================
-            # GRAFICO 3
-            # ================================================
-
             fig3, ax3 = plt.subplots(figsize=(10, 6))
 
             ax3.plot(
                 avg_risk,
                 exp_returns,
                 linewidth=2.5,
-                marker='o',
+                marker="o",
                 markersize=4
             )
 
             ax3.set_title(
-                'Efficient Frontier – SCR vs Expected Return',
+                "Efficient Frontier – SCR vs Expected Return",
                 pad=15,
-                weight='bold'
+                weight="bold"
             )
-
-            ax3.set_xlabel('Portfolio SCR')
-            ax3.set_ylabel('Expected Return')
-
-            ax3.xaxis.set_major_formatter(
-                mtick.PercentFormatter(1)
-            )
-
-            ax3.yaxis.set_major_formatter(
-                mtick.PercentFormatter(1)
-            )
-
-            ax3.xaxis.set_major_locator(
-                plt.MaxNLocator(10)
-            )
-
-            ax3.yaxis.set_major_locator(
-                plt.MaxNLocator(8)
-            )
+            ax3.set_xlabel("Portfolio SCR")
+            ax3.set_ylabel("Expected Return")
+            ax3.xaxis.set_major_formatter(mtick.PercentFormatter(1))
+            ax3.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+            ax3.xaxis.set_major_locator(plt.MaxNLocator(10))
+            ax3.yaxis.set_major_locator(plt.MaxNLocator(8))
 
             plt.tight_layout()
 
-            # ================================================
-            # MARGINALITA' - CODICE ORIGINALE
-            # ================================================
+            # ----------------------------------------
+            # MARGINAL SCR - CODICE ORIGINALE
+            # ----------------------------------------
 
             mSCR_simulations = []
             rend_per_mscr_simulations = []
@@ -909,17 +927,13 @@ if uploaded_file is not None:
                     .mean()
                 )
 
-                rend_per_mscr = (
-                    calculate_return_per_marginal_scr(
-                        weights[p],
-                        er,
-                        mSCR
-                    )
+                rend_per_mscr = calculate_return_per_marginal_scr(
+                    weights[p],
+                    er,
+                    mSCR
                 )
 
-                rend_per_mscr_simulations.append(
-                    rend_per_mscr
-                )
+                rend_per_mscr_simulations.append(rend_per_mscr)
 
                 rend_per_mscr = (
                     pd.concat(rend_per_mscr_simulations)
@@ -927,17 +941,15 @@ if uploaded_file is not None:
                     .mean()
                 )
 
-            # ================================================
+            # ----------------------------------------
             # TRADE-OFF ANALYSIS - CODICE ORIGINALE
-            # ================================================
+            # ----------------------------------------
 
             portfolio_idx = 99
 
             ASSET_NAMES = avg_weigths.columns.tolist()
 
-            W0 = avg_weigths.iloc[
-                portfolio_idx
-            ].values
+            W0 = avg_weigths.iloc[portfolio_idx].values
 
             EXP_RET = (
                 er.loc[ASSET_NAMES].values
@@ -945,24 +957,16 @@ if uploaded_file is not None:
             )
 
             COV = (
-                cov.loc[
-                    ASSET_NAMES,
-                    ASSET_NAMES
-                ].values
+                cov.loc[ASSET_NAMES, ASSET_NAMES].values
                 * ANNUALIZATION_FACTOR
             )
 
-            RISK_BASE = np.sqrt(
-                W0 @ COV @ W0
-            )
+            RISK_BASE = np.sqrt(W0 @ COV @ W0)
 
             mSCR_selected = calculate_marginal_scr(
                 avg_weigths.iloc[[portfolio_idx]],
                 vol.loc[ASSET_NAMES],
-                corr.loc[
-                    ASSET_NAMES,
-                    ASSET_NAMES
-                ],
+                corr.loc[ASSET_NAMES, ASSET_NAMES],
                 np.array([RISK_BASE])
             ).iloc[0].values
 
@@ -984,65 +988,21 @@ if uploaded_file is not None:
             )
 
         # ====================================================
-        # OUTPUT STREAMLIT
+        # OUTPUT
         # ====================================================
 
-        st.success("Simulazione completata.")
+        st.success("Optimization completed successfully.")
 
-        st.subheader("Model parameters")
+        st.header("4. Portfolio results")
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
 
         col1.metric("Simulations", SIM)
         col2.metric("Observations", SIMULATION)
         col3.metric("Frontier points", DEFAULT_FRONTIER_POINTS)
-        col4.metric("Lambda duration", LAMBDA_DURATION)
 
-        st.divider()
-
-        # --------------------------------------------
-        # INPUT
-        # --------------------------------------------
-
-        with st.expander("Market assumptions", expanded=False):
-
-            st.write("Expected Returns")
-            st.dataframe(er.to_frame("ExpRet"))
-
-            st.write("Volatility")
-            st.dataframe(vol.to_frame("Vola"))
-
-            st.write("Duration")
-            st.dataframe(duration.to_frame("Duration"))
-
-            st.write("Correlation Matrix")
-            st.dataframe(corr)
-
-            st.write("Covariance Matrix")
-            st.dataframe(cov)
-
-            st.write("Liability / Asset assumptions")
-
-            duration_inputs = pd.DataFrame({
-                "Duration Liability": duration_liab,
-                "Asset": asset_perc,
-                "Liability": liab_perc
-            })
-
-            st.dataframe(duration_inputs)
-
-        # --------------------------------------------
-        # OTTIMIZZAZIONE
-        # --------------------------------------------
-
-        st.header("Portfolio Optimization")
-
-        st.subheader("Portfolio results")
-
-        st.dataframe(
-            opt.style.format("{:.4%}"),
-            use_container_width=True
-        )
+        st.subheader("Portfolio optimization results")
+        st.dataframe(opt, use_container_width=True)
 
         st.subheader("Portfolio Allocation across Risk Levels")
         st.pyplot(fig)
@@ -1053,132 +1013,71 @@ if uploaded_file is not None:
         st.subheader("Efficient Frontier – SCR vs Expected Return")
         st.pyplot(fig3)
 
-        # --------------------------------------------
+        # ----------------------------------------
         # MARGINALITA'
-        # --------------------------------------------
+        # ----------------------------------------
 
-        st.divider()
-
-        st.header("Marginal Risk Contribution")
+        st.header("5. Marginal Risk Contribution")
 
         st.subheader("Marginal SCR")
-
-        st.dataframe(
-            mSCR,
-            use_container_width=True
-        )
+        st.dataframe(mSCR, use_container_width=True)
 
         st.subheader("Return per Marginal SCR")
+        st.dataframe(rend_per_mscr, use_container_width=True)
 
-        st.dataframe(
-            rend_per_mscr,
-            use_container_width=True
-        )
-
-        # --------------------------------------------
+        # ----------------------------------------
         # TRADE-OFF
-        # --------------------------------------------
+        # ----------------------------------------
 
-        st.divider()
+        st.header("6. Trade-off Analysis")
 
-        st.header("Trade-off Analysis")
-
-        st.write(
-            f"Selected portfolio: {portfolio_idx + 1}"
-        )
+        st.write("Selected portfolio:", portfolio_idx + 1)
 
         col1, col2 = st.columns(2)
 
-        col1.metric(
-            "Portfolio SCR",
-            f"{RISK_BASE:.4%}"
-        )
-
-        col2.metric(
-            "Expected Return",
-            f"{W0 @ EXP_RET:.4%}"
-        )
+        col1.metric("Portfolio SCR", f"{RISK_BASE:.4%}")
+        col2.metric("Expected Return", f"{W0 @ EXP_RET:.4%}")
 
         st.subheader("Marginal Return Differences")
-        st.dataframe(
-            DELTA_REND_MARG.style.format("{:.4%}"),
-            use_container_width=True
-        )
+        st.dataframe(DELTA_REND_MARG, use_container_width=True)
 
         st.subheader("Marginal Risk Differences")
-        st.dataframe(
-            DELTA_RISK_MARG.style.format("{:.4%}"),
-            use_container_width=True
-        )
+        st.dataframe(DELTA_RISK_MARG, use_container_width=True)
 
         st.subheader("Allocation Opportunities")
-        st.dataframe(
-            OPPORTUNITA_MARG,
-            use_container_width=True
-        )
+        st.dataframe(OPPORTUNITA_MARG, use_container_width=True)
 
         st.subheader("Trade-off Classification")
-        st.dataframe(
-            tradeoff,
-            use_container_width=True
-        )
+        st.dataframe(tradeoff, use_container_width=True)
 
         st.subheader("Reallocation Analysis")
+        st.dataframe(riallocation, use_container_width=True)
 
-        st.dataframe(
-            riallocation.style.format({
-                "DeltaRendimento": "{:.4%}",
-                "DeltaRischio": "{:.4%}",
-                "RendimentoNuovo": "{:.4%}",
-                "RischioNuovo": "{:.4%}"
-            }),
-            use_container_width=True
-        )
+        # ----------------------------------------
+        # DOWNLOAD EXCEL
+        # ----------------------------------------
 
-        # --------------------------------------------
-        # DOWNLOAD RISULTATI
-        # --------------------------------------------
+        import io
 
-        output = BytesIO()
+        output = io.BytesIO()
 
-        with pd.ExcelWriter(
-            output,
-            engine="openpyxl"
-        ) as writer:
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
 
-            opt.to_excel(
-                writer,
-                sheet_name="Portfolio Results"
-            )
+            opt.to_excel(writer, sheet_name="Portfolio Results")
+            avg_weigths.to_excel(writer, sheet_name="Average Weights")
 
-            avg_weigths.to_excel(
-                writer,
-                sheet_name="Average Weights"
-            )
-
-            pd.DataFrame(
-                risk
-            ).to_excel(
+            pd.DataFrame(risk).to_excel(
                 writer,
                 sheet_name="Risk Simulations"
             )
 
-            pd.DataFrame(
-                exp_ret
-            ).to_excel(
+            pd.DataFrame(exp_ret).to_excel(
                 writer,
                 sheet_name="Return Simulations"
             )
 
-            mSCR.to_excel(
-                writer,
-                sheet_name="Marginal SCR"
-            )
-
-            rend_per_mscr.to_excel(
-                writer,
-                sheet_name="Return per mSCR"
-            )
+            mSCR.to_excel(writer, sheet_name="Marginal SCR")
+            rend_per_mscr.to_excel(writer, sheet_name="Return per mSCR")
 
             DELTA_REND_MARG.to_excel(
                 writer,
@@ -1207,14 +1106,19 @@ if uploaded_file is not None:
             )
 
         st.download_button(
-            label="Download results Excel",
+            "Download results Excel",
             data=output.getvalue(),
             file_name="Portfolio_Optimization_Results.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
+    except Exception as e:
+
+        st.error(f"Errore durante l'esecuzione: {e}")
+
 else:
 
     st.info(
-        "Carica il file data_2.xlsx per avviare il modello."
+        "Inserisci gli input nelle tabelle e premi "
+        "'Run Portfolio Optimization'."
     )
