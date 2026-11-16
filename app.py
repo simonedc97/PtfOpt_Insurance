@@ -780,12 +780,7 @@ with st.sidebar:
 
 # %% MARKET INPUTS
 
-st.subheader("1. Market assumptions")
-
-st.write(
-    "Expected Return and Volatility are expressed in percentage. "
-    "Duration is expressed in years."
-)
+st.subheader("Market Assumptions")
 
 if "assets_input" not in st.session_state:
     st.session_state.assets_input = DEFAULT_ASSETS.copy()
@@ -797,7 +792,7 @@ edited_assets = st.data_editor(
     key="assets_editor",
     column_config={
         "Asset": st.column_config.TextColumn(
-            "Asset name",
+            "Asset Class",
             required=True
         ),
         "Expected Return (%)": st.column_config.NumberColumn(
@@ -858,12 +853,6 @@ n_assets = len(asset_names)
 
 # %% CORRELATION MATRIX
 
-st.subheader("2. Correlation matrix")
-
-st.caption(
-    "Enter correlations between -1 and 1. "
-    "The diagonal must equal 1 and the matrix must be symmetric."
-)
 
 default_corr = np.full(
     (n_assets, n_assets),
