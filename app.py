@@ -326,7 +326,7 @@ def simulate(
     asset_perc,
     n_portfolios,
     gamma_min,
-    ,
+    gamma_max,
     lambda_duration,
     seed=None,
     progress_callback=None
