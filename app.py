@@ -38,6 +38,19 @@ TARGET_SUM = 1.0
 # Original reallocation settings
 DEFAULT_SHIFT = 0.01
 
+# Fixed model parameters (not exposed in Streamlit sidebar)
+
+n_simulations = SIM
+n_portfolios = DEFAULT_FRONTIER_POINTS
+
+gamma_min = GAMMA_MIN
+gamma_max = GAMMA_MAX
+
+lambda_duration = LAMBDA_DURATION
+
+use_seed = False
+seed = 42
+
 # %% PLOT SETTINGS
 
 plt.rcParams.update({
