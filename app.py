@@ -373,7 +373,7 @@ def simulate(
             asset_perc=asset_perc,
             n_portfolios=n_portfolios,
             gamma_min=gamma_min,
-            =,
+            gamma_max=gamma_max,
             lambda_duration=lambda_duration
         )
 
