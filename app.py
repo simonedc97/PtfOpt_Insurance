@@ -1203,7 +1203,7 @@ frontier_df = pd.DataFrame({
 
 st.divider()
 
-st.header("3. Efficient frontier")
+st.header("Efficient frontier")
 
 left, right = st.columns([1, 2])
 
