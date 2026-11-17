@@ -239,28 +239,45 @@ def optimize_frontier(
 
     # Additional configurable constraint
     if additional_constraint_assets:
-
+    
         asset_indices = [
             simulated_returns.columns.get_loc(asset)
             for asset in additional_constraint_assets
         ]
-
-        selected_weights_sum = cp.sum(w[asset_indices])
-
-        if additional_constraint_operator == "<=":
-            constraints.append(
-                selected_weights_sum <= additional_constraint_limit
-            )
-
-        elif additional_constraint_operator == ">=":
-            constraints.append(
-                selected_weights_sum >= additional_constraint_limit
-            )
-
-        elif additional_constraint_operator == "==":
-            constraints.append(
-                selected_weights_sum == additional_constraint_limit
-            )
+    
+        if additional_constraint_type == "Aggregated":
+    
+            selected_weights_sum = cp.sum(w[asset_indices])
+    
+            if additional_constraint_operator == "<=":
+                constraints.append(
+                    selected_weights_sum <= additional_constraint_limit
+                )
+            elif additional_constraint_operator == ">=":
+                constraints.append(
+                    selected_weights_sum >= additional_constraint_limit
+                )
+            elif additional_constraint_operator == "==":
+                constraints.append(
+                    selected_weights_sum == additional_constraint_limit
+                )
+    
+        elif additional_constraint_type == "Individual":
+    
+            for idx in asset_indices:
+    
+                if additional_constraint_operator == "<=":
+                    constraints.append(
+                        w[idx] <= additional_constraint_limit
+                    )
+                elif additional_constraint_operator == ">=":
+                    constraints.append(
+                        w[idx] >= additional_constraint_limit
+                    )
+                elif additional_constraint_operator == "==":
+                    constraints.append(
+                        w[idx] == additional_constraint_limit
+                    )
 
     problem = cp.Problem(
         objective,
@@ -874,6 +891,12 @@ with st.sidebar:
             "Select assets",
             options=asset_names,
             default=[]
+        )
+
+        additional_constraint_type = st.selectbox(
+            "Constraint type",
+            options=["Aggregated", "Individual"],
+            index=0
         )
 
         additional_constraint_operator = st.selectbox(
