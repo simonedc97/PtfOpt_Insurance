@@ -168,6 +168,7 @@ def classify_allocation(dR, dS, tol=1e-12):
 # OPTIMIZATION ENGINE
 # ============================================================
 
+
 def optimize_frontier(
     simulated_returns,
     durations,
@@ -290,16 +291,67 @@ def optimize_frontier(
 
         gamma.value = float(gamma_value)
 
-        problem.solve()
+        # ----------------------------------------------------
+        # FIRST ATTEMPT: OSQP
+        # ----------------------------------------------------
+
+        try:
+
+            problem.solve(
+                solver=cp.OSQP,
+                verbose=False,
+                max_iter=50000,
+                eps_abs=1e-5,
+                eps_rel=1e-5,
+                polish=True,
+                adaptive_rho=True
+            )
+
+        except Exception as e:
+
+            warnings.warn(
+                f"OSQP failed for gamma={gamma_value:.6g}: {e}. "
+                "Trying CLARABEL."
+            )
+
+        # ----------------------------------------------------
+        # FALLBACK: CLARABEL
+        # ----------------------------------------------------
 
         if (
             problem.status not in
             (cp.OPTIMAL, cp.OPTIMAL_INACCURATE)
             or w.value is None
         ):
+
+            try:
+
+                problem.solve(
+                    solver=cp.CLARABEL,
+                    verbose=False
+                )
+
+            except Exception as e:
+
+                raise RuntimeError(
+                    f"Both OSQP and CLARABEL failed for "
+                    f"gamma={gamma_value:.6g}. "
+                    f"CLARABEL error: {e}"
+                )
+
+        # ----------------------------------------------------
+        # FINAL VALIDATION
+        # ----------------------------------------------------
+
+        if (
+            problem.status not in
+            (cp.OPTIMAL, cp.OPTIMAL_INACCURATE)
+            or w.value is None
+        ):
+
             raise RuntimeError(
                 f"Optimization failed for gamma={gamma_value:.6g}. "
-                f"Solver status: {problem.status}"
+                f"Final solver status: {problem.status}"
             )
 
         weights = np.asarray(w.value).flatten()
