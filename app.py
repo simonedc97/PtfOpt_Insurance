@@ -76,8 +76,8 @@ DEFAULT_ASSETS = pd.DataFrame({
     ],
     "Expected Return (%)": [
         0.0
-    ],
-    "": [
+    ],"SCR Market (%)":
+    [
         0.0
     ],
     "Duration": [
