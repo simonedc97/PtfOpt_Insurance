@@ -1,3 +1,4 @@
+
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -9,8 +10,7 @@ import warnings
 
 # ============================================================
 # PORTFOLIO OPTIMIZATION DASHBOARD
-# Faithful Streamlit implementation of the original Python model
-# Manual inputs - no Excel dependency
+# Multiple Additional Minimum / Maximum Weight Constraints
 # ============================================================
 
 # %% SETTINGS
@@ -29,15 +29,12 @@ GAMMA_MAX = 3
 LAMBDA_DURATION = 1.0
 SIM = 100
 
-# Original PortfolioConstraints
 MIN_WEIGHT = 0.0
 MAX_WEIGHT = 1.0
 TARGET_SUM = 1.0
 
-# Original reallocation settings
 DEFAULT_SHIFT = 0.01
 
-# Fixed model parameters
 n_simulations = SIM
 gamma_min = GAMMA_MIN
 gamma_max = GAMMA_MAX
@@ -71,7 +68,10 @@ DEFAULT_ASSETS = pd.DataFrame({
     "Duration": [0.0]
 })
 
-# %% SUPPORT FUNCTIONS
+
+# ============================================================
+# SUPPORT FUNCTIONS
+# ============================================================
 
 def corr_to_cov(corr_matrix, stdevs):
     return corr_matrix * np.outer(stdevs, stdevs)
@@ -115,10 +115,7 @@ def calculate_return_per_marginal_scr(weights, er, mSCR):
         (n_port, 1)
     )
 
-    rend_per_mscr = np.full(
-        (n_port, n_asset),
-        np.nan
-    )
+    rend_per_mscr = np.full((n_port, n_asset), np.nan)
 
     for p in range(n_port):
         for i in range(n_asset):
@@ -161,14 +158,15 @@ def classify_allocation(dR, dS, tol=1e-12):
             "Peggioramento"
         )
 
-    else:
-        return (
-            "Effetto nullo o invariato",
-            "Da verificare"
-        )
+    return (
+        "Effetto nullo o invariato",
+        "Da verificare"
+    )
 
 
-# %% OPTIMIZATION ENGINE
+# ============================================================
+# OPTIMIZATION ENGINE
+# ============================================================
 
 def optimize_frontier(
     simulated_returns,
@@ -180,26 +178,9 @@ def optimize_frontier(
     gamma_min,
     gamma_max,
     lambda_duration,
-    additional_constraint_assets=None,
-    additional_constraint_type="Aggregated",
-    additional_constraint_operator="<=",
-    additional_constraint_limit=1.0
+    additional_constraints=None
 ):
-    """
-    Direct implementation of the original EfficientFrontier class.
 
-    Additional constraint:
-
-    Aggregated:
-        The sum of selected asset weights is compared
-        with the specified limit.
-
-    Individual:
-        Each selected asset weight is independently
-        compared with the specified limit.
-    """
-
-    # Original EfficientFrontier input calculations
     mu = simulated_returns.mean() * ANNUALIZATION_FACTOR
 
     covariance = (
@@ -214,23 +195,16 @@ def optimize_frontier(
 
     n_assets = len(simulated_returns.columns)
 
-    # CVXPY variables
     w = cp.Variable(n_assets)
     gamma = cp.Parameter(nonneg=True)
 
-    # Original objective
-    risk = cp.quad_form(
-        w,
-        covariance.values
-    )
+    risk = cp.quad_form(w, covariance.values)
 
     ret = mu.values.T @ w
 
     duration_asset = duration @ w
 
-    duration_mismatch = (
-        duration_asset - duration_target
-    )
+    duration_mismatch = duration_asset - duration_target
 
     objective = cp.Maximize(
         ret
@@ -238,7 +212,8 @@ def optimize_frontier(
         - lambda_duration * cp.square(duration_mismatch)
     )
 
-    # Original PortfolioConstraints
+    # Standard portfolio constraints
+
     constraints = [
         cp.sum(w) == TARGET_SUM,
         w >= min_weight,
@@ -246,60 +221,60 @@ def optimize_frontier(
     ]
 
     # --------------------------------------------------------
-    # ADDITIONAL CONFIGURABLE WEIGHT CONSTRAINT
+    # MULTIPLE ADDITIONAL MINIMUM / MAXIMUM CONSTRAINTS
     # --------------------------------------------------------
 
-    if additional_constraint_assets:
+    if additional_constraints is not None:
 
-        asset_indices = [
-            simulated_returns.columns.get_loc(asset)
-            for asset in additional_constraint_assets
-        ]
+        for constraint in additional_constraints:
 
-        if additional_constraint_type == "Aggregated":
+            selected_assets = constraint["assets"]
+            constraint_type = constraint["type"]
 
-            # Sum of selected asset weights
-            selected_weights_sum = cp.sum(w[asset_indices])
+            min_limit = constraint["min_limit"]
+            max_limit = constraint["max_limit"]
 
-            if additional_constraint_operator == "<=":
-                constraints.append(
-                    selected_weights_sum <= additional_constraint_limit
-                )
+            if not selected_assets:
+                continue
 
-            elif additional_constraint_operator == ">=":
-                constraints.append(
-                    selected_weights_sum >= additional_constraint_limit
-                )
+            asset_indices = [
+                simulated_returns.columns.get_loc(asset)
+                for asset in selected_assets
+            ]
 
-            elif additional_constraint_operator == "==":
-                constraints.append(
-                    selected_weights_sum == additional_constraint_limit
-                )
+            # AGGREGATED: sum of selected asset weights
 
-        elif additional_constraint_type == "Individual":
+            if constraint_type == "Aggregated":
 
-            # Apply the same limit separately to each selected asset
-            for idx in asset_indices:
+                selected_weights = cp.sum(w[asset_indices])
 
-                if additional_constraint_operator == "<=":
+                if min_limit is not None:
                     constraints.append(
-                        w[idx] <= additional_constraint_limit
+                        selected_weights >= min_limit
                     )
 
-                elif additional_constraint_operator == ">=":
+                if max_limit is not None:
                     constraints.append(
-                        w[idx] >= additional_constraint_limit
+                        selected_weights <= max_limit
                     )
 
-                elif additional_constraint_operator == "==":
-                    constraints.append(
-                        w[idx] == additional_constraint_limit
-                    )
+            # INDIVIDUAL: separate constraint for each asset
 
-    problem = cp.Problem(
-        objective,
-        constraints
-    )
+            elif constraint_type == "Individual":
+
+                for idx in asset_indices:
+
+                    if min_limit is not None:
+                        constraints.append(
+                            w[idx] >= min_limit
+                        )
+
+                    if max_limit is not None:
+                        constraints.append(
+                            w[idx] <= max_limit
+                        )
+
+    problem = cp.Problem(objective, constraints)
 
     gamma_values = np.logspace(
         gamma_min,
@@ -315,7 +290,6 @@ def optimize_frontier(
 
         gamma.value = float(gamma_value)
 
-        # Same default solver selection as original code.
         problem.solve()
 
         if (
@@ -350,7 +324,9 @@ def optimize_frontier(
     )
 
 
-# %% MONTE CARLO SIMULATION
+# ============================================================
+# MONTE CARLO SIMULATION
+# ============================================================
 
 def simulate(
     er,
@@ -365,21 +341,10 @@ def simulate(
     gamma_min,
     gamma_max,
     lambda_duration,
-    additional_constraint_assets=None,
-    additional_constraint_type="Aggregated",
-    additional_constraint_operator="<=",
-    additional_constraint_limit=1.0,
+    additional_constraints=None,
     seed=None,
     progress_callback=None
 ):
-    """
-    Faithful implementation of the original simulate() function.
-
-    For every simulation:
-    - Generate n_observations multivariate normal observations.
-    - Calculate sample expected returns and covariance.
-    - Optimize n_portfolios portfolios.
-    """
 
     if seed is not None:
         np.random.seed(int(seed))
@@ -416,10 +381,7 @@ def simulate(
             gamma_min=gamma_min,
             gamma_max=gamma_max,
             lambda_duration=lambda_duration,
-            additional_constraint_assets=additional_constraint_assets,
-            additional_constraint_type=additional_constraint_type,
-            additional_constraint_operator=additional_constraint_operator,
-            additional_constraint_limit=additional_constraint_limit
+            additional_constraints=additional_constraints
         )
 
         weights_simulations.append(weights)
@@ -436,7 +398,9 @@ def simulate(
     )
 
 
-# %% ORIGINAL MONTE CARLO AGGREGATION
+# ============================================================
+# MONTE CARLO AGGREGATION
+# ============================================================
 
 def aggregate_simulations(
     weights_simulations,
@@ -449,13 +413,9 @@ def aggregate_simulations(
     asset_perc
 ):
 
-    avg_risk = pd.DataFrame(
-        risk_simulations
-    ).mean()
+    avg_risk = pd.DataFrame(risk_simulations).mean()
 
-    avg_ret = pd.DataFrame(
-        return_simulations
-    ).mean()
+    avg_ret = pd.DataFrame(return_simulations).mean()
 
     avg_weights = (
         pd.concat(weights_simulations)
@@ -506,7 +466,9 @@ def aggregate_simulations(
     )
 
 
-# %% MARGINAL SCR MONTE CARLO
+# ============================================================
+# MARGINAL SCR MONTE CARLO
+# ============================================================
 
 def calculate_marginal_averages(
     weights_simulations,
@@ -566,7 +528,9 @@ def calculate_marginal_averages(
     return avg_mSCR, avg_return_per_mscr
 
 
-# %% REALLOCATION ANALYSIS
+# ============================================================
+# REALLOCATION ANALYSIS
+# ============================================================
 
 def calculate_reallocation_analysis(
     W0,
@@ -602,7 +566,6 @@ def calculate_reallocation_analysis(
     )
 
     for i in range(n_asset):
-
         for j in range(n_asset):
 
             if i == j:
@@ -610,12 +573,9 @@ def calculate_reallocation_analysis(
                 TRADEOFF_MARG.iloc[i, j] = "N/A"
                 continue
 
-            dR = DELTA_REND[i, j]
-            dS = DELTA_RISK_MARG[i, j]
-
             classification, tradeoff = classify_allocation(
-                dR,
-                dS
+                DELTA_REND[i, j],
+                DELTA_RISK_MARG[i, j]
             )
 
             OPPORTUNITA_MARG.iloc[i, j] = classification
@@ -639,7 +599,6 @@ def calculate_reallocation_analysis(
     results = []
 
     for i in range(n_asset):
-
         for j in range(n_asset):
 
             if i == j:
@@ -677,23 +636,15 @@ def calculate_reallocation_analysis(
                 continue
 
             W1 = W0.copy()
-
             W1[i] += shift
             W1[j] -= shift
 
             REND_NUOVO = W1 @ EXP_RET
 
-            RISK_NUOVO = np.sqrt(
-                W1 @ COV @ W1
-            )
+            RISK_NUOVO = np.sqrt(W1 @ COV @ W1)
 
-            DELTA_REND_EFF = (
-                REND_NUOVO - REND_BASE
-            )
-
-            DELTA_RISK_EFF = (
-                RISK_NUOVO - RISK_BASE
-            )
+            DELTA_REND_EFF = REND_NUOVO - REND_BASE
+            DELTA_RISK_EFF = RISK_NUOVO - RISK_BASE
 
             classification, _ = classify_allocation(
                 DELTA_REND_EFF,
@@ -727,7 +678,10 @@ def calculate_reallocation_analysis(
 
 st.title("Portfolio Optimization Dashboard")
 
-# %% SIDEBAR
+
+# ============================================================
+# SIDEBAR - MODEL SETTINGS
+# ============================================================
 
 with st.sidebar:
 
@@ -805,7 +759,6 @@ with st.sidebar:
     ) / 100.0
 
 
-# Sidebar parameters converted to model values
 n_portfolios = int(default_frontier_points)
 n_simulations = int(SIM)
 
@@ -813,7 +766,9 @@ min_weight = min_weight_pct / 100.0
 max_weight = max_weight_pct / 100.0
 
 
-# %% MARKET INPUTS
+# ============================================================
+# MARKET INPUTS
+# ============================================================
 
 st.subheader("Market Assumptions")
 
@@ -887,72 +842,116 @@ if (
 n_assets = len(asset_names)
 
 
-# %% ADDITIONAL WEIGHT CONSTRAINT
+# ============================================================
+# MULTIPLE ADDITIONAL MINIMUM / MAXIMUM CONSTRAINTS
+# ============================================================
 
 with st.sidebar:
 
     st.divider()
 
-    st.header("Additional weight constraint")
+    st.header("Additional weight constraints")
 
-    enable_additional_constraint = st.checkbox(
-        "Enable additional constraint",
-        value=False
+    n_additional_constraints = st.number_input(
+        "Number of additional constraints",
+        min_value=0,
+        max_value=1000,
+        value=0,
+        step=1,
+        help="Choose how many independent additional constraints to define."
     )
 
-    # Initialize all parameters, even when the checkbox is disabled.
-    additional_constraint_assets = []
-    additional_constraint_type = "Aggregated"
-    additional_constraint_operator = "<="
-    additional_constraint_limit_pct = 100.0
+    additional_constraints = []
 
-    if enable_additional_constraint:
+    for i in range(int(n_additional_constraints)):
 
-        additional_constraint_assets = st.multiselect(
-            "Select assets",
-            options=asset_names,
-            default=[]
-        )
+        with st.expander(
+            f"Constraint {i + 1}",
+            expanded=True
+        ):
 
-        additional_constraint_type = st.selectbox(
-            "Constraint type",
-            options=["Aggregated", "Individual"],
-            index=0,
-            help=(
-                "Aggregated: the limit applies to the sum of selected "
-                "asset weights. Individual: the limit applies separately "
-                "to each selected asset."
+            st.caption(
+                "Configure the minimum and maximum allocation "
+                "for the selected assets."
             )
-        )
 
-        additional_constraint_operator = st.selectbox(
-            "Constraint operator",
-            options=["<=", ">=", "=="],
-            index=0
-        )
+            selected_assets = st.multiselect(
+                f"Select assets – Constraint {i + 1}",
+                options=asset_names,
+                default=[],
+                key=f"constraint_assets_{i}"
+            )
 
-        additional_constraint_limit_pct = st.number_input(
-            "Constraint limit (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=100.0,
-            step=1.0
-        )
+            constraint_type = st.selectbox(
+                f"Constraint type – Constraint {i + 1}",
+                options=["Aggregated", "Individual"],
+                key=f"constraint_type_{i}",
+                help=(
+                    "Aggregated: limits apply to the sum of selected "
+                    "asset weights. Individual: limits apply separately "
+                    "to each selected asset."
+                )
+            )
 
-additional_constraint_limit = (
-    additional_constraint_limit_pct / 100.0
-)
+            st.markdown("**Minimum weight**")
 
-if (
-    enable_additional_constraint
-    and len(additional_constraint_assets) == 0
-):
-    st.warning(
-        "Select at least one asset for the additional weight constraint."
-    )
+            enable_minimum = st.checkbox(
+                f"Enable minimum – Constraint {i + 1}",
+                value=True,
+                key=f"constraint_enable_min_{i}"
+            )
+
+            min_limit_pct = st.number_input(
+                f"Minimum weight (%) – Constraint {i + 1}",
+                min_value=0.0,
+                max_value=100.0,
+                value=0.0,
+                step=1.0,
+                disabled=not enable_minimum,
+                key=f"constraint_min_{i}"
+            )
+
+            st.markdown("**Maximum weight**")
+
+            enable_maximum = st.checkbox(
+                f"Enable maximum – Constraint {i + 1}",
+                value=True,
+                key=f"constraint_enable_max_{i}"
+            )
+
+            max_limit_pct = st.number_input(
+                f"Maximum weight (%) – Constraint {i + 1}",
+                min_value=0.0,
+                max_value=100.0,
+                value=100.0,
+                step=1.0,
+                disabled=not enable_maximum,
+                key=f"constraint_max_{i}"
+            )
+
+            min_limit = (
+                min_limit_pct / 100.0
+                if enable_minimum
+                else None
+            )
+
+            max_limit = (
+                max_limit_pct / 100.0
+                if enable_maximum
+                else None
+            )
+
+            additional_constraints.append({
+                "assets": selected_assets,
+                "type": constraint_type,
+                "min_limit": min_limit,
+                "max_limit": max_limit
+            })
 
 
-# %% CORRELATION MATRIX
+# ============================================================
+# CORRELATION MATRIX
+# ============================================================
 
 st.subheader("Correlation matrix")
 
@@ -967,6 +966,7 @@ if (
     "corr_input" not in st.session_state
     or st.session_state.get("corr_asset_names") != asset_names
 ):
+
     st.session_state.corr_input = pd.DataFrame(
         default_corr,
         index=asset_names,
@@ -993,7 +993,9 @@ corr_edited = st.data_editor(
 st.session_state.corr_input = corr_edited.copy()
 
 
-# %% VALIDATION
+# ============================================================
+# VALIDATION
+# ============================================================
 
 try:
 
@@ -1035,6 +1037,7 @@ except Exception:
     st.error("Invalid numerical inputs.")
     st.stop()
 
+
 if corr.shape != (n_assets, n_assets):
     st.error("Invalid correlation matrix dimensions.")
     st.stop()
@@ -1065,6 +1068,10 @@ if eigenvalues.min() < -1e-8:
     )
     st.stop()
 
+if min_weight > max_weight:
+    st.error("Minimum asset weight cannot exceed maximum asset weight.")
+    st.stop()
+
 if (
     min_weight * n_assets > TARGET_SUM + 1e-9
     or max_weight * n_assets < TARGET_SUM - 1e-9
@@ -1076,16 +1083,43 @@ if asset_pct <= 0:
     st.error("Asset percentage must be positive.")
     st.stop()
 
-if (
-    enable_additional_constraint
-    and len(additional_constraint_assets) == 0
-):
-    st.error(
-        "The additional constraint is enabled, but no assets have been selected."
-    )
-    st.stop()
+
+# ------------------------------------------------------------
+# VALIDATE ALL ADDITIONAL CONSTRAINTS
+# ------------------------------------------------------------
+
+for i, constraint in enumerate(additional_constraints):
+
+    if len(constraint["assets"]) == 0:
+        st.error(
+            f"Constraint {i + 1}: select at least one asset."
+        )
+        st.stop()
+
+    if (
+        constraint["min_limit"] is None
+        and constraint["max_limit"] is None
+    ):
+        st.error(
+            f"Constraint {i + 1}: enable at least a minimum "
+            "or a maximum weight."
+        )
+        st.stop()
+
+    if (
+        constraint["min_limit"] is not None
+        and constraint["max_limit"] is not None
+        and constraint["min_limit"] > constraint["max_limit"]
+    ):
+        st.error(
+            f"Constraint {i + 1}: minimum weight cannot exceed "
+            "maximum weight."
+        )
+        st.stop()
+
 
 # Original covariance matrix
+
 cov = pd.DataFrame(
     corr_to_cov(corr_df, vol_series.values)
     / ANNUALIZATION_FACTOR,
@@ -1098,7 +1132,9 @@ duration_target = (
 )
 
 
-# %% MODEL EXECUTION
+# ============================================================
+# MODEL EXECUTION
+# ============================================================
 
 st.divider()
 
@@ -1116,8 +1152,9 @@ with info_col:
 
     st.caption(
         "The model runs only when you press Run optimization. "
-        "The original methodology is preserved."
+        "All additional constraints are applied simultaneously."
     )
+
 
 if run_model:
 
@@ -1140,7 +1177,8 @@ if run_model:
                 text=f"Completed simulation {current}/{total}"
             )
 
-        # Original Monte Carlo simulation
+        # Monte Carlo simulation
+
         weights_simulations, risk_simulations, return_simulations = simulate(
             er=er,
             cov=cov,
@@ -1154,19 +1192,13 @@ if run_model:
             gamma_min=float(gamma_min),
             gamma_max=float(gamma_max),
             lambda_duration=float(lambda_duration),
-            additional_constraint_assets=(
-                additional_constraint_assets
-                if enable_additional_constraint
-                else None
-            ),
-            additional_constraint_type=additional_constraint_type,
-            additional_constraint_operator=additional_constraint_operator,
-            additional_constraint_limit=float(additional_constraint_limit),
+            additional_constraints=additional_constraints,
             seed=int(seed) if use_seed else None,
             progress_callback=update_progress
         )
 
-        # Original aggregation
+        # Aggregation
+
         (
             avg_weights,
             avg_risk,
@@ -1187,7 +1219,8 @@ if run_model:
             asset_pct
         )
 
-        # Original marginal SCR and Return / mSCR
+        # Marginal SCR
+
         avg_mSCR, avg_return_per_mscr = calculate_marginal_averages(
             weights_simulations,
             risk_simulations,
@@ -1220,17 +1253,15 @@ if run_model:
             "n_portfolios": int(n_portfolios),
             "seed": int(seed) if use_seed else None,
 
-            "additional_constraint": {
-                "enabled": enable_additional_constraint,
-                "assets": (
-                    additional_constraint_assets.copy()
-                    if enable_additional_constraint
-                    else []
-                ),
-                "type": additional_constraint_type,
-                "operator": additional_constraint_operator,
-                "limit": float(additional_constraint_limit)
-            },
+            "additional_constraints": [
+                {
+                    "assets": c["assets"].copy(),
+                    "type": c["type"],
+                    "min_limit": c["min_limit"],
+                    "max_limit": c["max_limit"]
+                }
+                for c in additional_constraints
+            ],
 
             "inputs": {
                 "duration_liab": float(duration_liab),
@@ -1254,9 +1285,7 @@ if run_model:
 
         progress_bar.empty()
 
-        st.error(
-            f"Optimization error: {exc}"
-        )
+        st.error(f"Optimization error: {exc}")
 
         st.stop()
 
@@ -1277,12 +1306,19 @@ if "optimization_result" not in st.session_state:
 res = st.session_state.optimization_result
 
 
-# Avoid displaying stale results after input changes
-current_additional_constraint_assets = (
-    additional_constraint_assets
-    if enable_additional_constraint
-    else []
-)
+# ------------------------------------------------------------
+# AVOID DISPLAYING STALE RESULTS
+# ------------------------------------------------------------
+
+current_additional_constraints = [
+    {
+        "assets": c["assets"].copy(),
+        "type": c["type"],
+        "min_limit": c["min_limit"],
+        "max_limit": c["max_limit"]
+    }
+    for c in additional_constraints
+]
 
 inputs_changed = (
     res["asset_names"] != asset_names
@@ -1297,14 +1333,7 @@ inputs_changed = (
     or res["inputs"]["max_weight"] != max_weight
     or res["n_portfolios"] != int(n_portfolios)
     or res["inputs"]["lambda_duration"] != float(lambda_duration)
-    or res["additional_constraint"]["enabled"] != enable_additional_constraint
-    or res["additional_constraint"]["assets"] != current_additional_constraint_assets
-    or res["additional_constraint"]["type"] != additional_constraint_type
-    or res["additional_constraint"]["operator"] != additional_constraint_operator
-    or not np.isclose(
-        res["additional_constraint"]["limit"],
-        float(additional_constraint_limit)
-    )
+    or res["additional_constraints"] != current_additional_constraints
 )
 
 if inputs_changed:
@@ -1317,7 +1346,9 @@ if inputs_changed:
     st.stop()
 
 
-# %% RESULTS
+# ============================================================
+# RESULTS
+# ============================================================
 
 avg_weights = res["avg_weights"]
 avg_risk = res["avg_risk"]
@@ -1335,7 +1366,9 @@ asset_names = res["asset_names"]
 n_port = len(avg_risk)
 
 
-# %% FRONTIER DATAFRAME
+# ============================================================
+# FRONTIER DATAFRAME
+# ============================================================
 
 frontier_df = pd.DataFrame({
     "Portfolio": np.arange(1, n_port + 1),
@@ -1348,7 +1381,9 @@ frontier_df = pd.DataFrame({
 })
 
 
-# %% PORTFOLIO SELECTION
+# ============================================================
+# PORTFOLIO SELECTION
+# ============================================================
 
 st.divider()
 
@@ -1389,28 +1424,15 @@ with right:
 
 k1, k2, k3, k4 = st.columns(4)
 
-k1.metric(
-    "Expected Return",
-    f"{selected_return:.2%}"
-)
-
-k2.metric(
-    "Portfolio SCR",
-    f"{selected_risk:.2%}"
-)
-
-k3.metric(
-    "Asset Duration",
-    f"{selected_duration:.2f}"
-)
-
-k4.metric(
-    "Duration Mismatch",
-    f"{selected_mismatch:.2f}"
-)
+k1.metric("Expected Return", f"{selected_return:.2%}")
+k2.metric("Portfolio SCR", f"{selected_risk:.2%}")
+k3.metric("Asset Duration", f"{selected_duration:.2f}")
+k4.metric("Duration Mismatch", f"{selected_mismatch:.2f}")
 
 
-# %% TABS
+# ============================================================
+# TABS
+# ============================================================
 
 (
     tab_data,
@@ -1444,9 +1466,7 @@ with tab_overview:
     st.markdown("**Portfolio Allocation across Risk Levels**")
 
     weights_by_risk = avg_weights.copy()
-
     weights_by_risk.index = avg_risk.values
-
     weights_by_risk = weights_by_risk.sort_index()
 
     fig, ax = plt.subplots(figsize=(13, 6))
@@ -1459,28 +1479,16 @@ with tab_overview:
     )
 
     ax.set_ylim(0, 1)
-
     ax.set_title(
         "Portfolio Allocation across Risk Levels",
         pad=15,
         weight="bold"
     )
-
     ax.set_xlabel("Portfolio SCR")
-
     ax.set_ylabel("Portfolio Weights")
-
-    ax.yaxis.set_major_formatter(
-        mtick.PercentFormatter(1)
-    )
-
-    ax.xaxis.set_major_locator(
-        plt.MaxNLocator(10)
-    )
-
-    ax.xaxis.set_major_formatter(
-        mtick.FormatStrFormatter("%.2f")
-    )
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%.2f"))
 
     ax.legend(
         loc="upper center",
@@ -1490,9 +1498,7 @@ with tab_overview:
     )
 
     fig.tight_layout()
-
     st.pyplot(fig, use_container_width=True)
-
     plt.close(fig)
 
     # 2. ASSET ALLOCATION BY PORTFOLIO RISK
@@ -1509,10 +1515,7 @@ with tab_overview:
         weights_by_risk_rounded
         .groupby(level=0)
         .mean()
-    )
-
-    weights_by_risk_rounded = (
-        weights_by_risk_rounded.sort_index()
+        .sort_index()
     )
 
     fig, ax = plt.subplots(figsize=(13, 6))
@@ -1530,16 +1533,9 @@ with tab_overview:
     )
 
     ax.set_xlabel("Portfolio SCR")
-
     ax.set_ylabel("Portfolio Weights")
-
-    ax.yaxis.set_major_formatter(
-        mtick.PercentFormatter(1)
-    )
-
-    ax.xaxis.set_major_locator(
-        plt.MaxNLocator(10)
-    )
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
 
     ax.legend(
         loc="upper center",
@@ -1549,9 +1545,7 @@ with tab_overview:
     )
 
     fig.tight_layout()
-
     st.pyplot(fig, use_container_width=True)
-
     plt.close(fig)
 
     # 3. EFFICIENT FRONTIER
@@ -1584,31 +1578,15 @@ with tab_overview:
     )
 
     ax.set_xlabel("Portfolio SCR")
-
     ax.set_ylabel("Expected Return")
-
-    ax.xaxis.set_major_formatter(
-        mtick.PercentFormatter(1)
-    )
-
-    ax.yaxis.set_major_formatter(
-        mtick.PercentFormatter(1)
-    )
-
-    ax.xaxis.set_major_locator(
-        plt.MaxNLocator(10)
-    )
-
-    ax.yaxis.set_major_locator(
-        plt.MaxNLocator(8)
-    )
-
+    ax.xaxis.set_major_formatter(mtick.PercentFormatter(1))
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax.yaxis.set_major_locator(plt.MaxNLocator(8))
     ax.legend(frameon=False)
 
     fig.tight_layout()
-
     st.pyplot(fig, use_container_width=True)
-
     plt.close(fig)
 
     # SELECTED PORTFOLIO ALLOCATION
@@ -1637,16 +1615,13 @@ with tab_overview:
     )
 
     ax.set_xlabel("Weight (%)")
-
     ax.set_title(
         f"Portfolio {selected_portfolio} – Asset Allocation",
         weight="bold"
     )
 
     fig.tight_layout()
-
     st.pyplot(fig, use_container_width=True)
-
     plt.close(fig)
 
 
@@ -1705,9 +1680,7 @@ with tab_portfolio:
     })
 
     st.dataframe(
-        metrics.style.format({
-            "Value": "{:.4f}"
-        }),
+        metrics.style.format({"Value": "{:.4f}"}),
         use_container_width=True,
         hide_index=True
     )
@@ -1758,20 +1731,11 @@ with tab_marginal:
             marginal_df["Marginal SCR"]
         )
 
-        ax.set_title(
-            "Marginal SCR by Asset",
-            weight="bold"
-        )
-
-        ax.tick_params(
-            axis="x",
-            rotation=75
-        )
+        ax.set_title("Marginal SCR by Asset", weight="bold")
+        ax.tick_params(axis="x", rotation=75)
 
         fig.tight_layout()
-
         st.pyplot(fig, use_container_width=True)
-
         plt.close(fig)
 
     with c2:
@@ -1788,15 +1752,10 @@ with tab_marginal:
             weight="bold"
         )
 
-        ax.tick_params(
-            axis="x",
-            rotation=75
-        )
+        ax.tick_params(axis="x", rotation=75)
 
         fig.tight_layout()
-
         st.pyplot(fig, use_container_width=True)
-
         plt.close(fig)
 
     st.divider()
@@ -1863,9 +1822,7 @@ with tab_reallocation:
         * ANNUALIZATION_FACTOR
     )
 
-    RISK_BASE = np.sqrt(
-        W0 @ COV @ W0
-    )
+    RISK_BASE = np.sqrt(W0 @ COV @ W0)
 
     mSCR_selected = calculate_marginal_scr(
         avg_weights.iloc[[idx]],
@@ -2102,9 +2059,9 @@ st.caption(
     "asset returns. For each simulation, the model generates "
     f"{SIMULATION} observations and optimizes "
     f"{n_portfolios} portfolios by maximizing "
-    "Expected Return − Gamma × Variance − Lambda × Duration "
-    "Mismatch². Portfolio weights, SCR and simulated returns are "
-    "averaged across simulations. Expected Return is calculated "
+    "Expected Return - Gamma x Variance - Lambda x Duration "
+    "Mismatch squared. Portfolio weights, SCR and simulated returns "
+    "are averaged across simulations. Expected Return is calculated "
     "using the average portfolio weights and original expected "
     "return assumptions. Marginal SCR and Return / mSCR follow "
     "the original Monte Carlo aggregation procedure. "
