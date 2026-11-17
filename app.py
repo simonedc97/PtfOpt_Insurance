@@ -1996,33 +1996,13 @@ with tab_reallocation:
 
 with tab_data:
 
-    st.subheader("Frontier – All Portfolios")
-
-    st.dataframe(
-        frontier_df.style.format({
-            "SCR (%)": "{:.4f}",
-            "Expected Return (%)": "{:.4f}",
-            "Simulated Return (%)": "{:.4f}",
-            "Asset Duration": "{:.4f}",
-            "Liability Duration": "{:.4f}",
-            "Duration Mismatch": "{:.4f}"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.divider()
-
-    st.subheader("Weights – All Portfolios")
-
+    st.subheader("Weights")
     weights_table = avg_weights.copy() * 100
-
     weights_table.insert(
         0,
         "Portfolio",
         np.arange(1, n_port + 1)
     )
-
     st.dataframe(
         weights_table.style.format({
             a: "{:.2f}%" for a in asset_names
@@ -2030,80 +2010,19 @@ with tab_data:
         use_container_width=True,
         hide_index=True
     )
-
     st.divider()
-
-    st.subheader("Complete Optimization Results")
-
+    
+    st.subheader("Statistics")
     st.dataframe(
-        res["opt"].style.format("{:.6f}"),
-        use_container_width=True
-    )
-
-    st.divider()
-
-    st.subheader("Download results")
-
-    csv_frontier = frontier_df.to_csv(
-        index=False
-    ).encode("utf-8")
-
-    csv_weights = weights_table.to_csv(
-        index=False
-    ).encode("utf-8")
-
-    csv_marginal = avg_mSCR.to_csv().encode("utf-8")
-
-    csv_return_mscr = (
-        avg_return_per_mscr.to_csv().encode("utf-8")
-    )
-
-    csv_reallocation = (
-        reallocation_table.to_csv(index=False).encode("utf-8")
-    )
-
-    d1, d2, d3 = st.columns(3)
-
-    d1.download_button(
-        "Download frontier CSV",
-        csv_frontier,
-        "frontier_results.csv",
-        "text/csv",
-        use_container_width=True
-    )
-
-    d2.download_button(
-        "Download weights CSV",
-        csv_weights,
-        "portfolio_weights.csv",
-        "text/csv",
-        use_container_width=True
-    )
-
-    d3.download_button(
-        "Download marginal SCR CSV",
-        csv_marginal,
-        "marginal_scr.csv",
-        "text/csv",
-        use_container_width=True
-    )
-
-    d4, d5 = st.columns(2)
-
-    d4.download_button(
-        "Download Return / mSCR CSV",
-        csv_return_mscr,
-        "return_per_mscr.csv",
-        "text/csv",
-        use_container_width=True
-    )
-
-    d5.download_button(
-        "Download reallocation CSV",
-        csv_reallocation,
-        "reallocation_analysis.csv",
-        "text/csv",
-        use_container_width=True
+        frontier_df.style.format({
+            "SCR (%)": "{:.4f}",
+            "Expected Return (%)": "{:.4f}",
+            "Asset Duration": "{:.4f}",
+            "Liability Duration": "{:.4f}",
+            "Duration Mismatch": "{:.4f}"
+        }),
+        use_container_width=True,
+        hide_index=True
     )
 
 
