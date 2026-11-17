@@ -840,7 +840,7 @@ st.subheader("Correlation matrix")
 
 default_corr = np.full(
     (n_assets, n_assets),
-    0.50
+    0.0
 )
 
 np.fill_diagonal(default_corr, 1.0)
