@@ -22,27 +22,24 @@ st.set_page_config(
     layout="wide"
 )
 
+DEFAULT_FRONTIER_POINTS = 100
 SIMULATION = 100
 ANNUALIZATION_FACTOR = 1
 GAMMA_MIN = -3
 GAMMA_MAX = 3
+LAMBDA_DURATION = 1.0
 SIM = 100
 
 # Original PortfolioConstraints
 MIN_WEIGHT = 0.0
 MAX_WEIGHT = 1.0
 TARGET_SUM = 1.0
-DEFAULT_FRONTIER_POINTS = 100
-LAMBDA_DURATION = 1.0
 
 # Original reallocation settings
 DEFAULT_SHIFT = 0.01
 
-# Fixed model parameters (not exposed in Streamlit sidebar)
-
+# Fixed model parameters
 n_simulations = SIM
-n_portfolios = int(default_frontier_points)
-
 gamma_min = GAMMA_MIN
 gamma_max = GAMMA_MAX
 
@@ -69,19 +66,10 @@ plt.rcParams.update({
 # %% DEFAULT INPUTS
 
 DEFAULT_ASSETS = pd.DataFrame({
-    "Asset": [
-        ""
-    ],
-    "Expected Return (%)": [
-        0.0
-    ],
-    "SCR Market (%)":
-    [
-        0.0
-    ],
-    "Duration": [
-        0.0
-    ]
+    "Asset": [""],
+    "Expected Return (%)": [0.0],
+    "SCR Market (%)": [0.0],
+    "Duration": [0.0]
 })
 
 # %% SUPPORT FUNCTIONS
@@ -277,7 +265,6 @@ def optimize_frontier(
 
         gamma.value = float(gamma_value)
 
-        # IMPORTANT:
         # Same default solver selection as original code.
         problem.solve()
 
@@ -335,9 +322,9 @@ def simulate(
     Faithful implementation of the original simulate() function.
 
     For every simulation:
-    - Generate 50 multivariate normal observations.
+    - Generate n_observations multivariate normal observations.
     - Calculate sample expected returns and covariance.
-    - Optimize 100 portfolios.
+    - Optimize n_portfolios portfolios.
     """
 
     if seed is not None:
@@ -474,11 +461,10 @@ def calculate_marginal_averages(
     er
 ):
     """
-    IMPORTANT:
     Reproduces the exact sequence of the original code.
 
-    In particular, the cumulative average mSCR is updated
-    before calculating Return / mSCR at each simulation.
+    The cumulative average mSCR is updated before calculating
+    Return / mSCR at each simulation.
     """
 
     mSCR_simulations = []
@@ -705,6 +691,26 @@ with st.sidebar:
 
     st.header("Model settings")
 
+    # Number of portfolios on the efficient frontier
+    default_frontier_points = st.number_input(
+        "Number of frontier portfolios",
+        min_value=10,
+        max_value=500,
+        value=DEFAULT_FRONTIER_POINTS,
+        step=10
+    )
+
+    # Duration penalty parameter
+    lambda_duration = st.number_input(
+        "Lambda Duration",
+        min_value=0.0,
+        max_value=100.0,
+        value=LAMBDA_DURATION,
+        step=0.1
+    )
+
+    st.divider()
+
     min_weight_pct = st.number_input(
         "Minimum weight (%)",
         min_value=0.0,
@@ -720,24 +726,10 @@ with st.sidebar:
         value=MAX_WEIGHT * 100,
         step=1.0
     )
-    default_frontier_points = st.number_input(
-        "Number of frontier portfolios",
-        min_value=10,
-        max_value=500,
-        value=100,
-        step=10
-    )
 
     st.divider()
 
     st.header("Liability assumptions")
-    lambda_duration = st.number_input(
-        "Lambda Duration",
-        min_value=0.0,
-        max_value=100.0,
-        value=1.0,
-        step=0.1
-    )
 
     duration_liab = st.number_input(
         "Liability duration",
@@ -773,6 +765,15 @@ with st.sidebar:
         value=1.0,
         step=0.5
     ) / 100.0
+
+
+# Sidebar parameters converted to model values
+n_portfolios = int(default_frontier_points)
+n_simulations = int(SIM)
+
+min_weight = min_weight_pct / 100.0
+max_weight = max_weight_pct / 100.0
+
 
 # %% MARKET INPUTS
 
@@ -847,7 +848,9 @@ if (
 
 n_assets = len(asset_names)
 
+
 # %% CORRELATION MATRIX
+
 st.subheader("Correlation matrix")
 
 default_corr = np.full(
@@ -885,6 +888,7 @@ corr_edited = st.data_editor(
 )
 
 st.session_state.corr_input = corr_edited.copy()
+
 
 # %% VALIDATION
 
@@ -959,9 +963,6 @@ if eigenvalues.min() < -1e-8:
     )
     st.stop()
 
-min_weight = min_weight_pct / 100.0
-max_weight = max_weight_pct / 100.0
-
 if (
     min_weight * n_assets > TARGET_SUM + 1e-9
     or max_weight * n_assets < TARGET_SUM - 1e-9
@@ -984,7 +985,6 @@ cov = pd.DataFrame(
 duration_target = (
     duration_liab * liability_pct / asset_pct
 )
-
 
 
 # %% MODEL EXECUTION
@@ -1128,6 +1128,7 @@ if run_model:
 
         st.stop()
 
+
 # ============================================================
 # OUTPUT
 # ============================================================
@@ -1142,6 +1143,7 @@ if "optimization_result" not in st.session_state:
     st.stop()
 
 res = st.session_state.optimization_result
+
 
 # Avoid displaying stale results after input changes
 inputs_changed = (
@@ -1168,6 +1170,7 @@ if inputs_changed:
 
     st.stop()
 
+
 # %% RESULTS
 
 avg_weights = res["avg_weights"]
@@ -1185,6 +1188,7 @@ asset_names = res["asset_names"]
 
 n_port = len(avg_risk)
 
+
 # %% FRONTIER DATAFRAME
 
 frontier_df = pd.DataFrame({
@@ -1196,6 +1200,7 @@ frontier_df = pd.DataFrame({
     "Liability Duration": res["inputs"]["duration_liab"],
     "Duration Mismatch": duration_mismatch.values
 })
+
 
 # %% PORTFOLIO SELECTION
 
@@ -1258,6 +1263,7 @@ k4.metric(
     f"{selected_mismatch:.2f}"
 )
 
+
 # %% TABS
 
 (
@@ -1274,6 +1280,7 @@ k4.metric(
     "Reallocation analysis"
 ])
 
+
 # ============================================================
 # TAB 1 - OVERVIEW
 # ============================================================
@@ -1287,9 +1294,7 @@ with tab_overview:
         np.linspace(0, 1, len(asset_names))
     )
 
-    # --------------------------------------------------------
     # 1. PORTFOLIO ALLOCATION ACROSS RISK LEVELS
-    # --------------------------------------------------------
 
     st.markdown("**Portfolio Allocation across Risk Levels**")
 
@@ -1345,9 +1350,7 @@ with tab_overview:
 
     plt.close(fig)
 
-    # --------------------------------------------------------
     # 2. ASSET ALLOCATION BY PORTFOLIO RISK
-    # --------------------------------------------------------
 
     st.markdown("**Asset Allocation by Portfolio Risk**")
 
@@ -1406,9 +1409,7 @@ with tab_overview:
 
     plt.close(fig)
 
-    # --------------------------------------------------------
     # 3. EFFICIENT FRONTIER
-    # --------------------------------------------------------
 
     st.markdown("**Efficient Frontier – SCR vs Expected Return**")
 
@@ -1465,9 +1466,7 @@ with tab_overview:
 
     plt.close(fig)
 
-    # --------------------------------------------------------
     # SELECTED PORTFOLIO ALLOCATION
-    # --------------------------------------------------------
 
     st.divider()
 
@@ -1750,9 +1749,7 @@ with tab_reallocation:
         min_weight=min_weight
     )
 
-    # --------------------------------------------------------
     # MARGINAL RETURN DIFFERENCE
-    # --------------------------------------------------------
 
     st.markdown("**1. Marginal Return Difference**")
 
@@ -1765,9 +1762,7 @@ with tab_reallocation:
         use_container_width=True
     )
 
-    # --------------------------------------------------------
     # MARGINAL RISK DIFFERENCE
-    # --------------------------------------------------------
 
     st.markdown("**2. Marginal SCR Difference**")
 
@@ -1776,9 +1771,7 @@ with tab_reallocation:
         use_container_width=True
     )
 
-    # --------------------------------------------------------
     # OPPORTUNITY MATRIX
-    # --------------------------------------------------------
 
     st.markdown("**3. Reallocation Opportunity Matrix**")
 
@@ -1787,9 +1780,7 @@ with tab_reallocation:
         use_container_width=True
     )
 
-    # --------------------------------------------------------
     # TRADE-OFF MATRIX
-    # --------------------------------------------------------
 
     st.markdown("**4. Trade-off Matrix**")
 
@@ -1798,9 +1789,7 @@ with tab_reallocation:
         use_container_width=True
     )
 
-    # --------------------------------------------------------
     # ACTUAL REALLOCATION TABLE
-    # --------------------------------------------------------
 
     st.divider()
 
@@ -1979,7 +1968,8 @@ st.caption(
     "Methodology: The efficient frontier is estimated through "
     "Monte Carlo simulations of multivariate normally distributed "
     "asset returns. For each simulation, the model generates "
-    "50 observations and optimizes 100 portfolios by maximizing "
+    f"{SIMULATION} observations and optimizes "
+    f"{n_portfolios} portfolios by maximizing "
     "Expected Return − Gamma × Variance − Lambda × Duration "
     "Mismatch². Portfolio weights, SCR and simulated returns are "
     "averaged across simulations. Expected Return is calculated "
