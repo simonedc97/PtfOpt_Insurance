@@ -72,28 +72,16 @@ plt.rcParams.update({
 
 DEFAULT_ASSETS = pd.DataFrame({
     "Asset": [
-        "Corporate Hybrids",
-        "Financials Capital Structure (Snr)",
-        "Financials Capital Structure (Snr NP)",
-        "Financials Capital Structure (LT2)",
-        "Financials Capital Structure (AT1)",
-        "X-Over BBB-BB",
-        "Leverage Loans",
-        "Structured Credit",
-        "CLOs",
-        "Equity High Dividend",
+        ""
     ],
     "Expected Return (%)": [
-        4.9, 6.0, 5.5, 7.1, 4.8,
-        3.89, 4.5, 3.7, 5.2, 10.0
+        0.0
     ],
     "": [
-        16.0, 30.2, 18.495, 26.167, 21.0,
-        11.0, 46.0, 22.78, 22.0, 22.0
+        0.0
     ],
     "Duration": [
-        4.0, 4.5, 4.5, 5.0, 5.0,
-        3.0, 2.0, 3.0, 2.5, 7.0
+        0.0
     ]
 })
 
