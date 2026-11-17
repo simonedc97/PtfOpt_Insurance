@@ -693,7 +693,7 @@ with st.sidebar:
 
     # Number of portfolios on the efficient frontier
     default_frontier_points = st.number_input(
-        "Number of frontier portfolios",
+        "Number of portfolios in the frontier",
         min_value=10,
         max_value=500,
         value=DEFAULT_FRONTIER_POINTS,
@@ -701,7 +701,7 @@ with st.sidebar:
     )
 
     min_weight_pct = st.number_input(
-        "Minimum weight (%)",
+        "Minimum asset weight (%)",
         min_value=0.0,
         max_value=100.0,
         value=MIN_WEIGHT * 100,
@@ -709,7 +709,7 @@ with st.sidebar:
     )
 
     max_weight_pct = st.number_input(
-        "Maximum weight (%)",
+        "Maximum asset weight (%)",
         min_value=0.1,
         max_value=100.0,
         value=MAX_WEIGHT * 100,
@@ -722,7 +722,7 @@ with st.sidebar:
   
     # Duration penalty parameter
     lambda_duration = st.number_input(
-        "Lambda Duration",
+        "Duration Penalty (0 for no duration costraints)",
         min_value=0.0,
         max_value=100.0,
         value=LAMBDA_DURATION,
