@@ -700,17 +700,6 @@ with st.sidebar:
         step=10
     )
 
-    # Duration penalty parameter
-    lambda_duration = st.number_input(
-        "Lambda Duration",
-        min_value=0.0,
-        max_value=100.0,
-        value=LAMBDA_DURATION,
-        step=0.1
-    )
-
-    st.divider()
-
     min_weight_pct = st.number_input(
         "Minimum weight (%)",
         min_value=0.0,
@@ -730,7 +719,16 @@ with st.sidebar:
     st.divider()
 
     st.header("Liability assumptions")
-
+  
+    # Duration penalty parameter
+    lambda_duration = st.number_input(
+        "Lambda Duration",
+        min_value=0.0,
+        max_value=100.0,
+        value=LAMBDA_DURATION,
+        step=0.1
+    )
+    
     duration_liab = st.number_input(
         "Liability duration",
         min_value=0.0,
