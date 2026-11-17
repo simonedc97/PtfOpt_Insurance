@@ -731,7 +731,7 @@ with st.sidebar:
     st.divider()
 
     st.header("Liability assumptions")
-        lambda_duration = st.number_input(
+    lambda_duration = st.number_input(
         "Lambda Duration",
         min_value=0.0,
         max_value=100.0,
