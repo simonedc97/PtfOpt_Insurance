@@ -1561,53 +1561,6 @@ with tab_overview:
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
-    # 2. ASSET ALLOCATION BY PORTFOLIO RISK
-
-    st.markdown("**Asset Allocation by Portfolio Risk**")
-
-    weights_by_risk_rounded = avg_weights.copy()
-
-    weights_by_risk_rounded.index = (
-        avg_risk.round(2).values
-    )
-
-    weights_by_risk_rounded = (
-        weights_by_risk_rounded
-        .groupby(level=0)
-        .mean()
-        .sort_index()
-    )
-
-    fig, ax = plt.subplots(figsize=(13, 6))
-
-    weights_by_risk_rounded.plot(
-        ax=ax,
-        color=colors,
-        linewidth=2
-    )
-
-    ax.set_title(
-        "Asset Allocation by Portfolio Risk",
-        pad=15,
-        weight="bold"
-    )
-
-    ax.set_xlabel("Portfolio SCR")
-    ax.set_ylabel("Portfolio Weights")
-    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
-    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-
-    ax.legend(
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.22),
-        ncol=3,
-        frameon=False
-    )
-
-    fig.tight_layout()
-    st.pyplot(fig, use_container_width=True)
-    plt.close(fig)
-
     # 3. EFFICIENT FRONTIER
 
     st.markdown("**Efficient Frontier – SCR vs Expected Return**")
@@ -1649,42 +1602,7 @@ with tab_overview:
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
-    # SELECTED PORTFOLIO ALLOCATION
-
-    st.divider()
-
-    st.subheader(
-        f"Portfolio {selected_portfolio} – Asset Allocation"
-    )
-
-    selected_allocation = pd.DataFrame({
-        "Asset": asset_names,
-        "Weight (%)": selected_weights * 100
-    }).sort_values(
-        "Weight (%)",
-        ascending=False
-    )
-
-    fig, ax = plt.subplots(
-        figsize=(10, max(4, 0.4 * len(asset_names)))
-    )
-
-    ax.barh(
-        selected_allocation["Asset"][::-1],
-        selected_allocation["Weight (%)"][::-1]
-    )
-
-    ax.set_xlabel("Weight (%)")
-    ax.set_title(
-        f"Portfolio {selected_portfolio} – Asset Allocation",
-        weight="bold"
-    )
-
-    fig.tight_layout()
-    st.pyplot(fig, use_container_width=True)
-    plt.close(fig)
-
-
+ 
 # ============================================================
 # TAB 2 - PORTFOLIO ANALYSIS
 # ============================================================
