@@ -181,6 +181,7 @@ def optimize_frontier(
     gamma_max,
     lambda_duration,
     additional_constraint_assets=None,
+    additional_constraint_type="Aggregated",
     additional_constraint_operator="<=",
     additional_constraint_limit=1.0
 ):
@@ -188,7 +189,14 @@ def optimize_frontier(
     Direct implementation of the original EfficientFrontier class.
 
     Additional constraint:
-    Sum of selected asset weights compared with a configurable limit.
+
+    Aggregated:
+        The sum of selected asset weights is compared
+        with the specified limit.
+
+    Individual:
+        Each selected asset weight is independently
+        compared with the specified limit.
     """
 
     # Original EfficientFrontier input calculations
@@ -237,43 +245,52 @@ def optimize_frontier(
         w <= max_weight
     ]
 
-    # Additional configurable constraint
+    # --------------------------------------------------------
+    # ADDITIONAL CONFIGURABLE WEIGHT CONSTRAINT
+    # --------------------------------------------------------
+
     if additional_constraint_assets:
-    
+
         asset_indices = [
             simulated_returns.columns.get_loc(asset)
             for asset in additional_constraint_assets
         ]
-    
+
         if additional_constraint_type == "Aggregated":
-    
+
+            # Sum of selected asset weights
             selected_weights_sum = cp.sum(w[asset_indices])
-    
+
             if additional_constraint_operator == "<=":
                 constraints.append(
                     selected_weights_sum <= additional_constraint_limit
                 )
+
             elif additional_constraint_operator == ">=":
                 constraints.append(
                     selected_weights_sum >= additional_constraint_limit
                 )
+
             elif additional_constraint_operator == "==":
                 constraints.append(
                     selected_weights_sum == additional_constraint_limit
                 )
-    
+
         elif additional_constraint_type == "Individual":
-    
+
+            # Apply the same limit separately to each selected asset
             for idx in asset_indices:
-    
+
                 if additional_constraint_operator == "<=":
                     constraints.append(
                         w[idx] <= additional_constraint_limit
                     )
+
                 elif additional_constraint_operator == ">=":
                     constraints.append(
                         w[idx] >= additional_constraint_limit
                     )
+
                 elif additional_constraint_operator == "==":
                     constraints.append(
                         w[idx] == additional_constraint_limit
@@ -349,6 +366,7 @@ def simulate(
     gamma_max,
     lambda_duration,
     additional_constraint_assets=None,
+    additional_constraint_type="Aggregated",
     additional_constraint_operator="<=",
     additional_constraint_limit=1.0,
     seed=None,
@@ -399,6 +417,7 @@ def simulate(
             gamma_max=gamma_max,
             lambda_duration=lambda_duration,
             additional_constraint_assets=additional_constraint_assets,
+            additional_constraint_type=additional_constraint_type,
             additional_constraint_operator=additional_constraint_operator,
             additional_constraint_limit=additional_constraint_limit
         )
@@ -881,7 +900,9 @@ with st.sidebar:
         value=False
     )
 
+    # Initialize all parameters, even when the checkbox is disabled.
     additional_constraint_assets = []
+    additional_constraint_type = "Aggregated"
     additional_constraint_operator = "<="
     additional_constraint_limit_pct = 100.0
 
@@ -896,7 +917,12 @@ with st.sidebar:
         additional_constraint_type = st.selectbox(
             "Constraint type",
             options=["Aggregated", "Individual"],
-            index=0
+            index=0,
+            help=(
+                "Aggregated: the limit applies to the sum of selected "
+                "asset weights. Individual: the limit applies separately "
+                "to each selected asset."
+            )
         )
 
         additional_constraint_operator = st.selectbox(
@@ -1133,6 +1159,7 @@ if run_model:
                 if enable_additional_constraint
                 else None
             ),
+            additional_constraint_type=additional_constraint_type,
             additional_constraint_operator=additional_constraint_operator,
             additional_constraint_limit=float(additional_constraint_limit),
             seed=int(seed) if use_seed else None,
@@ -1192,6 +1219,7 @@ if run_model:
             "n_simulations": int(n_simulations),
             "n_portfolios": int(n_portfolios),
             "seed": int(seed) if use_seed else None,
+
             "additional_constraint": {
                 "enabled": enable_additional_constraint,
                 "assets": (
@@ -1199,9 +1227,11 @@ if run_model:
                     if enable_additional_constraint
                     else []
                 ),
+                "type": additional_constraint_type,
                 "operator": additional_constraint_operator,
                 "limit": float(additional_constraint_limit)
             },
+
             "inputs": {
                 "duration_liab": float(duration_liab),
                 "liability_pct": float(liability_pct),
@@ -1269,6 +1299,7 @@ inputs_changed = (
     or res["inputs"]["lambda_duration"] != float(lambda_duration)
     or res["additional_constraint"]["enabled"] != enable_additional_constraint
     or res["additional_constraint"]["assets"] != current_additional_constraint_assets
+    or res["additional_constraint"]["type"] != additional_constraint_type
     or res["additional_constraint"]["operator"] != additional_constraint_operator
     or not np.isclose(
         res["additional_constraint"]["limit"],
