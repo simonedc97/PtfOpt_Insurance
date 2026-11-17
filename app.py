@@ -1,4 +1,3 @@
-
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -75,34 +74,22 @@ DEFAULT_ASSETS = pd.DataFrame({
 # %% SUPPORT FUNCTIONS
 
 def corr_to_cov(corr_matrix, stdevs):
-    """
-    Original correlation-to-covariance conversion.
-    """
     return corr_matrix * np.outer(stdevs, stdevs)
 
 
 def portfolio_risk(weights, covariance):
-    """
-    Portfolio standard deviation.
-    """
     return float(np.sqrt(max(weights @ covariance @ weights, 0.0)))
 
 
 def calculate_marginal_scr(weights, vol, corr, risk):
-    """
-    Faithful implementation of the original marginal SCR function.
 
-    weights: DataFrame (portfolios x assets)
-    vol: Series
-    corr: DataFrame
-    risk: array of portfolio risks
-    """
     D = vol.values
     CORR = corr.values
 
     mSCR = np.zeros_like(weights.values)
 
     for p in range(len(weights)):
+
         W = weights.iloc[p].values
         SCR_COMPONENT = W * D
 
@@ -119,9 +106,7 @@ def calculate_marginal_scr(weights, vol, corr, risk):
 
 
 def calculate_return_per_marginal_scr(weights, er, mSCR):
-    """
-    Original Return / Marginal SCR calculation.
-    """
+
     n_port = len(weights)
     n_asset = len(weights.columns)
 
@@ -194,10 +179,16 @@ def optimize_frontier(
     n_portfolios,
     gamma_min,
     gamma_max,
-    lambda_duration
+    lambda_duration,
+    additional_constraint_assets=None,
+    additional_constraint_operator="<=",
+    additional_constraint_limit=1.0
 ):
     """
     Direct implementation of the original EfficientFrontier class.
+
+    Additional constraint:
+    Sum of selected asset weights compared with a configurable limit.
     """
 
     # Original EfficientFrontier input calculations
@@ -245,6 +236,31 @@ def optimize_frontier(
         w >= min_weight,
         w <= max_weight
     ]
+
+    # Additional configurable constraint
+    if additional_constraint_assets:
+
+        asset_indices = [
+            simulated_returns.columns.get_loc(asset)
+            for asset in additional_constraint_assets
+        ]
+
+        selected_weights_sum = cp.sum(w[asset_indices])
+
+        if additional_constraint_operator == "<=":
+            constraints.append(
+                selected_weights_sum <= additional_constraint_limit
+            )
+
+        elif additional_constraint_operator == ">=":
+            constraints.append(
+                selected_weights_sum >= additional_constraint_limit
+            )
+
+        elif additional_constraint_operator == "==":
+            constraints.append(
+                selected_weights_sum == additional_constraint_limit
+            )
 
     problem = cp.Problem(
         objective,
@@ -315,6 +331,9 @@ def simulate(
     gamma_min,
     gamma_max,
     lambda_duration,
+    additional_constraint_assets=None,
+    additional_constraint_operator="<=",
+    additional_constraint_limit=1.0,
     seed=None,
     progress_callback=None
 ):
@@ -361,7 +380,10 @@ def simulate(
             n_portfolios=n_portfolios,
             gamma_min=gamma_min,
             gamma_max=gamma_max,
-            lambda_duration=lambda_duration
+            lambda_duration=lambda_duration,
+            additional_constraint_assets=additional_constraint_assets,
+            additional_constraint_operator=additional_constraint_operator,
+            additional_constraint_limit=additional_constraint_limit
         )
 
         weights_simulations.append(weights)
@@ -390,9 +412,6 @@ def aggregate_simulations(
     liability_perc,
     asset_perc
 ):
-    """
-    Same aggregation logic as the original Python code.
-    """
 
     avg_risk = pd.DataFrame(
         risk_simulations
@@ -460,19 +479,12 @@ def calculate_marginal_averages(
     corr,
     er
 ):
-    """
-    Reproduces the exact sequence of the original code.
-
-    The cumulative average mSCR is updated before calculating
-    Return / mSCR at each simulation.
-    """
 
     mSCR_simulations = []
     return_per_mscr_simulations = []
 
     for p in range(len(weights_simulations)):
 
-        # Marginal SCR for current simulation
         mSCR_current = calculate_marginal_scr(
             weights_simulations[p],
             vol.loc[weights_simulations[p].columns],
@@ -485,14 +497,12 @@ def calculate_marginal_averages(
 
         mSCR_simulations.append(mSCR_current)
 
-        # Original progressive average
         mSCR_average = (
             pd.concat(mSCR_simulations)
             .groupby(level=0)
             .mean()
         )
 
-        # Original Return / mSCR
         return_per_mscr_current = (
             calculate_return_per_marginal_scr(
                 weights_simulations[p],
@@ -505,7 +515,6 @@ def calculate_marginal_averages(
             return_per_mscr_current
         )
 
-    # Final average across simulations
     avg_mSCR = (
         pd.concat(mSCR_simulations)
         .groupby(level=0)
@@ -556,7 +565,6 @@ def calculate_reallocation_analysis(
         columns=asset_names
     )
 
-    # Marginal opportunity and trade-off matrices
     for i in range(n_asset):
 
         for j in range(n_asset):
@@ -589,13 +597,11 @@ def calculate_reallocation_analysis(
         columns=asset_names
     )
 
-    # Base portfolio
     REND_BASE = W0 @ EXP_RET
     RISK_BASE = np.sqrt(W0 @ COV @ W0)
 
     results = []
 
-    # One-for-one reallocation
     for i in range(n_asset):
 
         for j in range(n_asset):
@@ -691,7 +697,6 @@ with st.sidebar:
 
     st.header("Model settings")
 
-    # Number of portfolios on the efficient frontier
     default_frontier_points = st.number_input(
         "Number of portfolios in the frontier",
         min_value=10,
@@ -719,16 +724,15 @@ with st.sidebar:
     st.divider()
 
     st.header("Liability assumptions")
-  
-    # Duration penalty parameter
+
     lambda_duration = st.number_input(
-        "Duration Penalty (0 for no duration costraints)",
+        "Duration Penalty (0 for no duration constraints)",
         min_value=0.0,
         max_value=100.0,
         value=LAMBDA_DURATION,
         step=0.1
     )
-    
+
     duration_liab = st.number_input(
         "Liability duration",
         min_value=0.0,
@@ -847,6 +851,58 @@ if (
 n_assets = len(asset_names)
 
 
+# %% ADDITIONAL WEIGHT CONSTRAINT
+
+with st.sidebar:
+
+    st.divider()
+
+    st.header("Additional weight constraint")
+
+    enable_additional_constraint = st.checkbox(
+        "Enable additional constraint",
+        value=False
+    )
+
+    additional_constraint_assets = []
+    additional_constraint_operator = "<="
+    additional_constraint_limit_pct = 100.0
+
+    if enable_additional_constraint:
+
+        additional_constraint_assets = st.multiselect(
+            "Select assets",
+            options=asset_names,
+            default=[]
+        )
+
+        additional_constraint_operator = st.selectbox(
+            "Constraint operator",
+            options=["<=", ">=", "=="],
+            index=0
+        )
+
+        additional_constraint_limit_pct = st.number_input(
+            "Constraint limit (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=100.0,
+            step=1.0
+        )
+
+additional_constraint_limit = (
+    additional_constraint_limit_pct / 100.0
+)
+
+if (
+    enable_additional_constraint
+    and len(additional_constraint_assets) == 0
+):
+    st.warning(
+        "Select at least one asset for the additional weight constraint."
+    )
+
+
 # %% CORRELATION MATRIX
 
 st.subheader("Correlation matrix")
@@ -950,7 +1006,6 @@ if not np.allclose(np.diag(corr), 1.0, atol=1e-6):
     st.error("The diagonal must be equal to 1.")
     st.stop()
 
-# Original model does not apply a nearest PSD adjustment.
 eigenvalues = np.linalg.eigvalsh(corr)
 
 if eigenvalues.min() < -1e-8:
@@ -970,6 +1025,15 @@ if (
 
 if asset_pct <= 0:
     st.error("Asset percentage must be positive.")
+    st.stop()
+
+if (
+    enable_additional_constraint
+    and len(additional_constraint_assets) == 0
+):
+    st.error(
+        "The additional constraint is enabled, but no assets have been selected."
+    )
     st.stop()
 
 # Original covariance matrix
@@ -1041,6 +1105,13 @@ if run_model:
             gamma_min=float(gamma_min),
             gamma_max=float(gamma_max),
             lambda_duration=float(lambda_duration),
+            additional_constraint_assets=(
+                additional_constraint_assets
+                if enable_additional_constraint
+                else None
+            ),
+            additional_constraint_operator=additional_constraint_operator,
+            additional_constraint_limit=float(additional_constraint_limit),
             seed=int(seed) if use_seed else None,
             progress_callback=update_progress
         )
@@ -1098,6 +1169,16 @@ if run_model:
             "n_simulations": int(n_simulations),
             "n_portfolios": int(n_portfolios),
             "seed": int(seed) if use_seed else None,
+            "additional_constraint": {
+                "enabled": enable_additional_constraint,
+                "assets": (
+                    additional_constraint_assets.copy()
+                    if enable_additional_constraint
+                    else []
+                ),
+                "operator": additional_constraint_operator,
+                "limit": float(additional_constraint_limit)
+            },
             "inputs": {
                 "duration_liab": float(duration_liab),
                 "liability_pct": float(liability_pct),
@@ -1144,6 +1225,12 @@ res = st.session_state.optimization_result
 
 
 # Avoid displaying stale results after input changes
+current_additional_constraint_assets = (
+    additional_constraint_assets
+    if enable_additional_constraint
+    else []
+)
+
 inputs_changed = (
     res["asset_names"] != asset_names
     or not np.allclose(res["er"].values, er.values)
@@ -1157,6 +1244,13 @@ inputs_changed = (
     or res["inputs"]["max_weight"] != max_weight
     or res["n_portfolios"] != int(n_portfolios)
     or res["inputs"]["lambda_duration"] != float(lambda_duration)
+    or res["additional_constraint"]["enabled"] != enable_additional_constraint
+    or res["additional_constraint"]["assets"] != current_additional_constraint_assets
+    or res["additional_constraint"]["operator"] != additional_constraint_operator
+    or not np.isclose(
+        res["additional_constraint"]["limit"],
+        float(additional_constraint_limit)
+    )
 )
 
 if inputs_changed:
@@ -1287,7 +1381,6 @@ with tab_overview:
 
     st.subheader("Portfolio allocation and efficient frontier")
 
-    # Original colors
     colors = plt.get_cmap("tab20")(
         np.linspace(0, 1, len(asset_names))
     )
@@ -1576,7 +1669,6 @@ with tab_marginal:
         "Marginal SCR and Return per Marginal SCR"
     )
 
-    # Original Monte Carlo averages
     selected_mSCR = avg_mSCR.iloc[idx]
 
     selected_return_mscr = avg_return_per_mscr.iloc[idx]
@@ -1705,7 +1797,6 @@ with tab_reallocation:
         "the asset reduced."
     )
 
-    # Original portfolio data
     W0 = avg_weights.iloc[idx].values
 
     EXP_RET = (
@@ -1722,7 +1813,6 @@ with tab_reallocation:
         W0 @ COV @ W0
     )
 
-    # Original selected portfolio marginal SCR
     mSCR_selected = calculate_marginal_scr(
         avg_weights.iloc[[idx]],
         vol_series.loc[asset_names],
@@ -1747,8 +1837,6 @@ with tab_reallocation:
         min_weight=min_weight
     )
 
-    # MARGINAL RETURN DIFFERENCE
-
     st.markdown("**1. Marginal Return Difference**")
 
     st.caption(
@@ -1760,16 +1848,12 @@ with tab_reallocation:
         use_container_width=True
     )
 
-    # MARGINAL RISK DIFFERENCE
-
     st.markdown("**2. Marginal SCR Difference**")
 
     st.dataframe(
         DELTA_RISK_MARG.style.format("{:+.6f}"),
         use_container_width=True
     )
-
-    # OPPORTUNITY MATRIX
 
     st.markdown("**3. Reallocation Opportunity Matrix**")
 
@@ -1778,16 +1862,12 @@ with tab_reallocation:
         use_container_width=True
     )
 
-    # TRADE-OFF MATRIX
-
     st.markdown("**4. Trade-off Matrix**")
 
     st.dataframe(
         TRADEOFF_MARG,
         use_container_width=True
     )
-
-    # ACTUAL REALLOCATION TABLE
 
     st.divider()
 
