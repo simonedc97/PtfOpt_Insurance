@@ -1548,7 +1548,8 @@ with tab_overview:
     ax.set_ylabel("Portfolio Weights")
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1))
     ax.xaxis.set_major_locator(plt.MaxNLocator(10))
-    ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%.2f"))
+    ax.xaxis.set_major_formatter(mtick.PercentFormatter(1))
+    #ax.xaxis.set_major_formatter(mtick.FormatStrFormatter("%.2f"))
 
     ax.legend(
         loc="upper center",
