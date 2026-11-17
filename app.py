@@ -783,8 +783,8 @@ edited_assets = st.data_editor(
             "Expected Return (%)",
             format="%.3f"
         ),
-        "Volatility (%)": st.column_config.NumberColumn(
-            "Volatility (%)",
+        "SCR Market (%)": st.column_config.NumberColumn(
+            "SCR Market (%)",
             format="%.3f"
         ),
         "Duration": st.column_config.NumberColumn(
@@ -811,7 +811,7 @@ if (
 
 numeric_cols = [
     "Expected Return (%)",
-    "Volatility (%)",
+    "SCR Market (%)",
     "Duration"
 ]
 
@@ -824,7 +824,7 @@ except Exception:
 if (
     numeric_data.isna().any().any()
     or not np.isfinite(numeric_data.values).all()
-    or (numeric_data["Volatility (%)"] <= 0).any()
+    or (numeric_data["SCR Market (%)"] <= 0).any()
     or (numeric_data["Duration"] < 0).any()
 ):
     st.error(
@@ -887,7 +887,7 @@ try:
     )
 
     vol = (
-        numeric_data["Volatility (%)"].to_numpy()
+        numeric_data["SCR Market (%)"].to_numpy()
         / 100.0
     )
 
