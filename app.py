@@ -22,18 +22,18 @@ st.set_page_config(
     layout="wide"
 )
 
-DEFAULT_FRONTIER_POINTS = 100
 SIMULATION = 100
 ANNUALIZATION_FACTOR = 1
 GAMMA_MIN = -3
 GAMMA_MAX = 3
-LAMBDA_DURATION = 1.0
 SIM = 100
 
 # Original PortfolioConstraints
 MIN_WEIGHT = 0.0
 MAX_WEIGHT = 1.0
 TARGET_SUM = 1.0
+DEFAULT_FRONTIER_POINTS = 100
+LAMBDA_DURATION = 1.0
 
 # Original reallocation settings
 DEFAULT_SHIFT = 0.01
@@ -41,12 +41,10 @@ DEFAULT_SHIFT = 0.01
 # Fixed model parameters (not exposed in Streamlit sidebar)
 
 n_simulations = SIM
-n_portfolios = DEFAULT_FRONTIER_POINTS
+n_portfolios = int(default_frontier_points)
 
 gamma_min = GAMMA_MIN
 gamma_max = GAMMA_MAX
-
-lambda_duration = LAMBDA_DURATION
 
 use_seed = False
 seed = 42
@@ -722,10 +720,24 @@ with st.sidebar:
         value=MAX_WEIGHT * 100,
         step=1.0
     )
+    default_frontier_points = st.number_input(
+        "Number of frontier portfolios",
+        min_value=10,
+        max_value=500,
+        value=100,
+        step=10
+    )
 
     st.divider()
 
     st.header("Liability assumptions")
+        lambda_duration = st.number_input(
+        "Lambda Duration",
+        min_value=0.0,
+        max_value=100.0,
+        value=1.0,
+        step=0.1
+    )
 
     duration_liab = st.number_input(
         "Liability duration",
@@ -1143,6 +1155,8 @@ inputs_changed = (
     or res["inputs"]["asset_pct"] != float(asset_pct)
     or res["inputs"]["min_weight"] != min_weight
     or res["inputs"]["max_weight"] != max_weight
+    or res["n_portfolios"] != int(n_portfolios)
+    or res["inputs"]["lambda_duration"] != float(lambda_duration)
 )
 
 if inputs_changed:
