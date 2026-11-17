@@ -783,7 +783,7 @@ edited_assets = st.data_editor(
             format="%.3f"
         ),
         "Volatility (%)": st.column_config.NumberColumn(
-            "SCR (%)",
+            "Volatility (%)",
             format="%.3f"
         ),
         "Duration": st.column_config.NumberColumn(
