@@ -1632,7 +1632,7 @@ with tab_portfolio:
         standalone_scr.sum()
     )
 
-    if total_weighted_standalone_scr > 1e-12:
+    if total_standalone_scr > 1e-12:
         scr_contribution = (
             standalone_scr
             / total_standalone_scr
