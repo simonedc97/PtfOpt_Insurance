@@ -1611,7 +1611,7 @@ with tab_overview:
 with tab_portfolio:
 
     st.subheader(
-        f"Portfolio {selected_portfolio} – Asset Risk Contribution"
+        f"Portfolio composition and Marginality"
     )
 
     # Selected portfolio weights
@@ -1731,7 +1731,7 @@ with tab_reallocation:
 
 
 
-    st.markdown("**1. Trade-off Matrix**")
+    st.markdown("**Trade-off Matrix**")
 
     st.caption(
         "Rows: asset increased | Columns: asset reduced. "
@@ -1748,7 +1748,7 @@ with tab_reallocation:
 
 
 
-    st.markdown("**2. Effective Reallocation Analysis**")
+    st.markdown("**Reallocation Analysis 1 vs 1**")
 
     st.caption(
         f"Reallocation shift: {shift_pct:.2%} | "
