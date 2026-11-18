@@ -1691,11 +1691,6 @@ with tab_reallocation:
 
     st.subheader("One-for-one Reallocation Analysis")
 
-    st.caption(
-        "Rows represent the asset increased; columns represent "
-        "the asset reduced."
-    )
-
     W0 = avg_weights.iloc[idx].values
 
     EXP_RET = (
@@ -1734,32 +1729,15 @@ with tab_reallocation:
         min_weight=min_weight
     )
 
-    st.markdown("**1. Marginal Return Difference**")
+
+
+    st.markdown("**1. Trade-off Matrix**")
 
     st.caption(
-        "Rows: asset increased. Columns: asset reduced."
+        "Rows: asset increased | Columns: asset reduced. "
+        f"Each reallocation shifts {shift_pct:.2%} from the column asset "
+        "to the row asset."
     )
-
-    st.dataframe(
-        DELTA_REND_MARG.style.format("{:+.4%}"),
-        use_container_width=True
-    )
-
-    st.markdown("**2. Marginal SCR Difference**")
-
-    st.dataframe(
-        DELTA_RISK_MARG.style.format("{:+.6f}"),
-        use_container_width=True
-    )
-
-    st.markdown("**3. Reallocation Opportunity Matrix**")
-
-    st.dataframe(
-        OPPORTUNITA_MARG,
-        use_container_width=True
-    )
-
-    st.markdown("**4. Trade-off Matrix**")
 
     st.dataframe(
         TRADEOFF_MARG,
@@ -1768,7 +1746,9 @@ with tab_reallocation:
 
     st.divider()
 
-    st.markdown("**5. Effective Reallocation Analysis**")
+
+
+    st.markdown("**2. Effective Reallocation Analysis**")
 
     st.caption(
         f"Reallocation shift: {shift_pct:.2%} | "
@@ -1814,7 +1794,6 @@ with tab_reallocation:
         use_container_width=True,
         hide_index=True
     )
-
 
 # ============================================================
 # TAB 5 - DATA TABLES
