@@ -1689,75 +1689,7 @@ with tab_portfolio:
 
 with tab_reallocation:
 
-    st.subheader("One-for-one Reallocation Analysis")
 
-    st.caption(
-        "Rows represent the asset increased; columns represent "
-        "the asset reduced."
-    )
-
-    W0 = avg_weights.iloc[idx].values
-
-    EXP_RET = (
-        er.loc[asset_names].values
-        * ANNUALIZATION_FACTOR
-    )
-
-    COV = (
-        cov.loc[asset_names, asset_names].values
-        * ANNUALIZATION_FACTOR
-    )
-
-    RISK_BASE = np.sqrt(W0 @ COV @ W0)
-
-    mSCR_selected = calculate_marginal_scr(
-        avg_weights.iloc[[idx]],
-        vol_series.loc[asset_names],
-        corr_df.loc[asset_names, asset_names],
-        np.array([RISK_BASE])
-    ).iloc[0].values
-
-    (
-        DELTA_REND_MARG,
-        DELTA_RISK_MARG,
-        OPPORTUNITA_MARG,
-        TRADEOFF_MARG,
-        reallocation_table
-    ) = calculate_reallocation_analysis(
-        W0=W0,
-        asset_names=asset_names,
-        EXP_RET=EXP_RET,
-        COV=COV,
-        mSCR=mSCR_selected,
-        shift=shift_pct,
-        max_weight=max_weight,
-        min_weight=min_weight
-    )
-
-    st.markdown("**1. Marginal Return Difference**")
-
-    st.caption(
-        "Rows: asset increased. Columns: asset reduced."
-    )
-
-    st.dataframe(
-        DELTA_REND_MARG.style.format("{:+.4%}"),
-        use_container_width=True
-    )
-
-    st.markdown("**2. Marginal SCR Difference**")
-
-    st.dataframe(
-        DELTA_RISK_MARG.style.format("{:+.6f}"),
-        use_container_width=True
-    )
-
-    st.markdown("**3. Reallocation Opportunity Matrix**")
-
-    st.dataframe(
-        OPPORTUNITA_MARG,
-        use_container_width=True
-    )
 
     st.markdown("**4. Trade-off Matrix**")
 
