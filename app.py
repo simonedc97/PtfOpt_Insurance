@@ -1676,7 +1676,7 @@ with tab_portfolio:
             "Stand-alone SCR (%)": "{:.2%}",
             "mSCR (%)": "{:.2%}",
             "Correlation Benefit (%)": "{:+.2%}",
-            "Return / mSCR": "{:.4f}"
+            "E(R) / mSCR": "{:.4f}"
         }),
         use_container_width=True,
         hide_index=True
@@ -1689,7 +1689,7 @@ with tab_portfolio:
 
 with tab_reallocation:
 
-    st.subheader("One-for-one Reallocation Analysis")
+    st.subheader("Reallocation Analysis")
 
     W0 = avg_weights.iloc[idx].values
 
@@ -1782,14 +1782,22 @@ with tab_reallocation:
         "RendimentoNuovo (%)",
         "RischioNuovo (%)",
         "Classificazione"
-    ]]
+    ]].rename(columns={
+    "AssetAumentato": "Increased Asset",
+    "AssetRidotto": "Reduced Asset",
+    "DeltaRendimento (pp)": "Delta Return",
+    "DeltaRischio (pp)": "Dekta SCR",
+    "RendimentoNuovo (%)": "New Return (%)",
+    "RischioNuovo (%)": "New SCR (%)",
+    "Classificazione": "Classification"
+})
 
     st.dataframe(
         display_reallocation.style.format({
-            "DeltaRendimento (pp)": "{:+.4f}",
-            "DeltaRischio (pp)": "{:+.4f}",
-            "RendimentoNuovo (%)": "{:.4f}",
-            "RischioNuovo (%)": "{:.4f}"
+            "Return Variation (pp)": "{:+.4f}",
+            "SCR Variation (pp)": "{:+.4f}",
+            "New Expected Return (%)": "{:.4f}",
+            "New SCR (%)": "{:.4f}"
         }),
         use_container_width=True,
         hide_index=True
