@@ -1603,6 +1603,7 @@ with tab_overview:
 
  
 
+
 # ============================================================
 # TAB 2 - PORTFOLIO RESULTS
 # ============================================================
@@ -1628,14 +1629,14 @@ with tab_portfolio:
     )
 
     # SCR Contribution
-    total_standalone_scr = (
-        standalone_scr.sum()
+    total_weighted_standalone_scr = (
+        weighted_standalone_scr.sum()
     )
 
-    if total_standalone_scr > 1e-12:
+    if total_weighted_standalone_scr > 1e-12:
         scr_contribution = (
-            standalone_scr
-            / total_standalone_scr
+            weighted_standalone_scr
+            / total_weighted_standalone_scr
         )
     else:
         scr_contribution = pd.Series(
