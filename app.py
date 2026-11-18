@@ -1498,13 +1498,11 @@ k4.metric("Duration Mismatch", f"{selected_mismatch:.2f}")
     tab_data,
     tab_overview,
     tab_portfolio,
-    tab_marginal,
     tab_reallocation
 ) = st.tabs([
     "Portfolio Weights",
     "Graph",
-    "Portfolio analysis",
-    "Marginal SCR",
+    "Portfolio Results",
     "Reallocation analysis"
 ])
 
@@ -1604,172 +1602,80 @@ with tab_overview:
     plt.close(fig)
 
  
+
 # ============================================================
-# TAB 2 - PORTFOLIO ANALYSIS
+# TAB 2 - PORTFOLIO RESULTS
 # ============================================================
 
 with tab_portfolio:
 
     st.subheader(
-        f"Portfolio {selected_portfolio} – Composition"
+        f"Portfolio {selected_portfolio} – Asset Risk Contribution"
     )
 
-    allocation_table = pd.DataFrame({
+    # Selected portfolio weights
+    selected_weights_series = pd.Series(
+        selected_weights,
+        index=asset_names
+    )
+
+    # Stand-alone SCR
+    standalone_scr = vol_series.loc[asset_names]
+
+    # Weighted stand-alone SCR
+    weighted_standalone_scr = (
+        selected_weights_series * standalone_scr
+    )
+
+    # SCR Contribution
+    total_weighted_standalone_scr = (
+        weighted_standalone_scr.sum()
+    )
+
+    if total_weighted_standalone_scr > 1e-12:
+        scr_contribution = (
+            weighted_standalone_scr
+            / total_weighted_standalone_scr
+        )
+    else:
+        scr_contribution = pd.Series(
+            0.0,
+            index=asset_names
+        )
+
+    # Marginal SCR for selected portfolio
+    selected_mSCR = avg_mSCR.iloc[idx].loc[asset_names]
+
+    # Correlation Benefit
+    correlation_benefit = (
+        weighted_standalone_scr - selected_mSCR
+    )
+
+    # Return / mSCR sensitivity
+    return_per_mscr = (
+        avg_return_per_mscr.iloc[idx].loc[asset_names]
+    )
+
+    # Final portfolio table
+    portfolio_results = pd.DataFrame({
         "Asset": asset_names,
-        "Weight": selected_weights,
-        "Expected Return": er.values,
-        "Volatility": vol_series.values,
-        "Duration": durations.values,
-        "Contribution to Return": selected_weights * er.values
+        "Optimal Weight (%)": selected_weights_series.values,
+        "SCR Contribution (%)": scr_contribution.values,
+        "Stand-alone SCR (%)": standalone_scr.values,
+        "mSCR (%)": selected_mSCR.values,
+        "Correlation Benefit (%)": correlation_benefit.values,
+        "Return / mSCR": return_per_mscr.values
     })
 
+    # Display
     st.dataframe(
-        allocation_table.style.format({
-            "Weight": "{:.2%}",
-            "Expected Return": "{:.2%}",
-            "Volatility": "{:.2%}",
-            "Duration": "{:.2f}",
-            "Contribution to Return": "{:.2%}"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.divider()
-
-    st.subheader("Portfolio metrics")
-
-    metrics = pd.DataFrame({
-        "Metric": [
-            "Expected Return",
-            "Simulated Expected Return",
-            "Portfolio SCR",
-            "Asset Duration",
-            "Liability Duration Target",
-            "Duration Mismatch"
-        ],
-        "Value": [
-            selected_return,
-            selected_sim_return,
-            selected_risk,
-            selected_duration,
-            res["duration_target"],
-            selected_mismatch
-        ]
-    })
-
-    st.dataframe(
-        metrics.style.format({"Value": "{:.4f}"}),
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-# ============================================================
-# TAB 3 - MARGINAL SCR
-# ============================================================
-
-with tab_marginal:
-
-    st.subheader(
-        "Marginal SCR and Return per Marginal SCR"
-    )
-
-    selected_mSCR = avg_mSCR.iloc[idx]
-
-    selected_return_mscr = avg_return_per_mscr.iloc[idx]
-
-    marginal_df = pd.DataFrame({
-        "Asset": asset_names,
-        "Weight (%)": selected_weights * 100,
-        "Marginal SCR": selected_mSCR.values,
-        "Return / mSCR": selected_return_mscr.values
-    }).sort_values(
-        "Marginal SCR",
-        ascending=False
-    )
-
-    st.dataframe(
-        marginal_df.style.format({
-            "Weight (%)": "{:.2f}%",
-            "Marginal SCR": "{:.6f}",
+        portfolio_results.style.format({
+            "Optimal Weight (%)": "{:.2%}",
+            "SCR Contribution (%)": "{:.2%}",
+            "Stand-alone SCR (%)": "{:.2%}",
+            "mSCR (%)": "{:.2%}",
+            "Correlation Benefit (%)": "{:+.2%}",
             "Return / mSCR": "{:.4f}"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-
-        fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.bar(
-            marginal_df["Asset"],
-            marginal_df["Marginal SCR"]
-        )
-
-        ax.set_title("Marginal SCR by Asset", weight="bold")
-        ax.tick_params(axis="x", rotation=75)
-
-        fig.tight_layout()
-        st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
-
-    with c2:
-
-        fig, ax = plt.subplots(figsize=(8, 5))
-
-        ax.bar(
-            marginal_df["Asset"],
-            marginal_df["Return / mSCR"]
-        )
-
-        ax.set_title(
-            "Expected Return per Marginal SCR",
-            weight="bold"
-        )
-
-        ax.tick_params(axis="x", rotation=75)
-
-        fig.tight_layout()
-        st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
-
-    st.divider()
-
-    st.subheader("Marginal SCR – All Portfolios")
-
-    all_marginal = avg_mSCR.copy()
-
-    all_marginal.insert(
-        0,
-        "Portfolio",
-        np.arange(1, n_port + 1)
-    )
-
-    st.dataframe(
-        all_marginal.style.format({
-            a: "{:.6f}" for a in asset_names
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.subheader("Return / mSCR – All Portfolios")
-
-    all_return_mscr = avg_return_per_mscr.copy()
-
-    all_return_mscr.insert(
-        0,
-        "Portfolio",
-        np.arange(1, n_port + 1)
-    )
-
-    st.dataframe(
-        all_return_mscr.style.format({
-            a: "{:.4f}" for a in asset_names
         }),
         use_container_width=True,
         hide_index=True
